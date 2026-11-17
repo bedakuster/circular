@@ -1,6 +1,9 @@
 <html>
 
 <head>
+    <title>Online Cyclograph Simulator</title>
+    <meta charset="UTF-8">
+    <meta name="description" content="Online Cyclograph Simulator">
     <style>
         :root {
             --bg: #f4f4f4;
@@ -64,11 +67,13 @@
             white-space: nowrap;
             width: 50px;
         }
+
         .control.big {
             display: flex;
             flex-direction: row;
             flex-wrap: wrap;
         }
+
         .control.big span {
             width: 100%;
         }
@@ -165,16 +170,16 @@
                 <label class="control"><span>Prime</span><input id="primeGear" type="range" min="1" max="80"
                         value="43"><input class="value" type="number" min="1" max="80" step="1" value="23"
                         data-slider="primeGear"></label>
-                <label class="control"><span>Norm</span><input id="normGear" type="range" min="1" max="120"
+                <label class="control"><span>Normal</span><input id="normGear" type="range" min="1" max="120"
                         value="40"><input class="value" type="number" min="1" max="120" step="1" value="60"
                         data-slider="normGear"></label>
-                <label class="control"><span>Turn</span><input id="turntable" type="range" min="1" max="180"
+                <label class="control"><span>Turntable</span><input id="turntable" type="range" min="1" max="180"
                         value="60"><input class="value" type="number" min="1" max="180" step="1" value="60"
                         data-slider="turntable"></label>
 
                 <label class="control"><span>Anchor</span><select id="anchor">
                         <option>Prime</option>
-                        <option selected>Norm</option>
+                        <option selected>Normal</option>
                     </select></label>
 
                 <label class="control"><span>Prime ×</span><input id="primeGearMultiplier" step="0.1" type="range"
@@ -240,14 +245,20 @@
                 </label>
             </div>
             <div class="panel">
+                <button onclick="immediate()">Immediate Result</button>
+            </div>
+            <div class="panel">
+                <button onclick="start()">Start Animation</button>
+                <button onclick="stop()">Stop Animation</button>
+                <button onclick="restart()">Restart Animation</button>
+            </div>
+
+            <div class="panel">
                 <button id="themeToggle" type="button">Dark mode</button>
-                <button onclick="immediate()">Immediate</button>
-                <button onclick="start()">Start</button>
-                <button onclick="stop()">Stop</button>
-                <button onclick="restart()">Restart</button>
             </div>
 
         </div>
+
         <div class="maincontent">
             <div id="info-panel" class="panel">
             </div>

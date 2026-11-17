@@ -1,6 +1,16 @@
 let canvas = null
 let ctx = null
 
+let turntableLocationX = 500
+let turntableLocationY = 500
+let turntableRadius = 400
+
+let primeDotStartY = 200
+let primeDotStartX = 100
+
+let normDotStartY = 200
+let normDotStartX = 900
+
 let primeGear = 23
 let primeGearMultiplier = 1
 
@@ -19,7 +29,7 @@ let planetaryGearEnabled = true
 let planetaryInnerGear = 120
 let planetaryOuterGear = 29
 
-const gearSize60 = 100
+let gearSize60 = 100
 let turntable = 60
 
 let anchor = 'Prime'
@@ -109,14 +119,7 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     const turntableY = Math.cos(rounds * 2 * Math.PI * (reverseTurntable ? -1 : 1))
     const turntableX = Math.sin(rounds * 2 * Math.PI * (reverseTurntable ? -1 : 1))
 
-    const turntableStartX = 500
-    const turntableStartY = 500
 
-    const primeDotStart = 200
-    const primeDotStartX = 100
-
-    const normDotStartY = 200
-    const normDotStartX = 900
 
     if (!skipDraw) {
         // ctx.reset()
@@ -126,7 +129,7 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
 
     for (let i = 0; i < points.length; i++) {
         const p = points[i]
-        const rotatedPoint = rotatePointAroundPivot(p, turntableStartX, turntableStartY, (rounds - currentRounds) * (reverseTurntable ? -1 : 1))
+        const rotatedPoint = rotatePointAroundPivot(p, turntableLocationX, turntableLocationY, (rounds - currentRounds) * (reverseTurntable ? -1 : 1))
 
         p.x = rotatedPoint.x
         p.y = rotatedPoint.y
@@ -139,15 +142,15 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
 
 
     let primeDotCurrentX = primeDotStartX + primeX * gearSize60 / 60 * primeGear * primeGearMultiplier
-    const primeDotCurrentY = primeDotStart + primeY * gearSize60 / 60 * primeGear * primeGearMultiplier
+    const primeDotCurrentY = primeDotStartY + primeY * gearSize60 / 60 * primeGear * primeGearMultiplier
 
     const normXWay = normX * gearSize60 / 60 * normGear * normGearMultiplier
 
     let normDotCurrentX = normDotStartX + normX * gearSize60 / 60 * normGear * normGearMultiplier
     let normDotCurrentY = normDotStartY + normY * gearSize60 / 60 * normGear * normGearMultiplier
 
-    const turntableCurrentX = turntableStartX + turntableX * 400
-    const turntableCurrentY = turntableStartY + turntableY * 400
+    const turntableCurrentX = turntableLocationX + turntableX * 400
+    const turntableCurrentY = turntableLocationY + turntableY * 400
 
     const drawControls = document.getElementById('drawControls').checked
 
@@ -193,7 +196,7 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     let sx = normDotCurrentX
     let sy = normDotCurrentY
 
-    if (anchor == 'Norm') {
+    if (anchor == 'Normal') {
         [ox, oy] = [normDotCurrentX, normDotCurrentY];
         [sx, sy] = [primeDotCurrentX, primeDotCurrentY];
     }
@@ -212,8 +215,8 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     const midpointAxisX = midX
     const midpointAxisY = midY
 
-    const rotatedNormPointX = midpointAxisX + (normDotCurrentX - midpointAxisX) * Math.cos(Math.PI / 180 * rodAngle) - (normDotCurrentY - midpointAxisY) * Math.sin(Math.PI / 180 * rodAngle)
-    const rotatedNormPointY = midpointAxisY + (normDotCurrentX - midpointAxisX) * Math.sin(Math.PI / 180 * rodAngle) + (normDotCurrentY - midpointAxisY) * Math.cos(Math.PI / 180 * rodAngle)
+    const rotatedNormPointX = midpointAxisX + (ox - midpointAxisX) * Math.cos(Math.PI / 180 * rodAngle) - (oy - midpointAxisY) * Math.sin(Math.PI / 180 * rodAngle)
+    const rotatedNormPointY = midpointAxisY + (ox - midpointAxisX) * Math.sin(Math.PI / 180 * rodAngle) + (oy - midpointAxisY) * Math.cos(Math.PI / 180 * rodAngle)
 
     let d2x = rotatedNormPointX - midpointAxisX
     let d2y = rotatedNormPointY - midpointAxisY
@@ -228,16 +231,16 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
         ctx.fillStyle = getControlColor()
         ctx.lineWidth = 1
         ctx.font = '12px Arial'
-        ctx.fillText(primeGear.toString(), 100, 220)
-        ctx.fillText(normGear.toString(), 900, 220)
-        ctx.fillText(turntable.toString(), 500, 80)
+        ctx.fillText(primeGear.toString(), primeDotStartX, primeDotStartY)
+        ctx.fillText(normGear.toString(), normDotStartX, normDotStartY)
+        ctx.fillText(turntable.toString(), turntableLocationX, turntableLocationY - turntableRadius - 20)
 
         ctx.lineWidth = 0.5
         ctx.strokeStyle = getControlColor()
         ctx.fillStyle = getControlColor()
 
         ctx.beginPath()
-        ctx.arc(100, 200, gearSize60 / 60 * primeGear, 0, 2 * Math.PI)
+        ctx.arc(primeDotStartX, primeDotStartY, gearSize60 / 60 * primeGear * primeGearMultiplier, 0, 2 * Math.PI)
         ctx.stroke()
 
 
@@ -247,7 +250,7 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
 
 
         ctx.beginPath()
-        ctx.arc(900, 200, gearSize60 / 60 * normGear, 0, 2 * Math.PI)
+        ctx.arc(normDotStartX, normDotStartY, gearSize60 / 60 * normGear * normGearMultiplier, 0, 2 * Math.PI)
         ctx.stroke()
 
 
@@ -257,12 +260,12 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
 
 
         ctx.beginPath()
-        ctx.arc(500, 500, 400, 0, 2 * Math.PI)
+        ctx.arc(turntableLocationX, turntableLocationY, turntableRadius, 0, 2 * Math.PI)
         ctx.stroke()
 
         ctx.fillStyle = getControlColor()
         ctx.beginPath()
-        ctx.arc(500, 500, 2, 0, 2 * Math.PI)
+        ctx.arc(turntableLocationX, turntableLocationY, 2, 0, 2 * Math.PI)
         ctx.fill()
 
 
@@ -325,6 +328,10 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
             return
         }
     }
+
+    // setTimeout(() => {
+    //     animationHandle = window.requestAnimationFrame(() => calculatePoint(currentRounds + stepSize))
+    // }, 1000)
 
     animationHandle = window.requestAnimationFrame(() => calculatePoint(currentRounds + stepSize))
 
@@ -394,7 +401,7 @@ function updateParams() {
     planetaryInnerGear = parseInt(document.getElementById('planetaryInnerGear').value)
     planetaryOuterGear = parseInt(document.getElementById('planetaryOuterGear').value)
 
-    if(planetaryGearEnabled) {
+    if (planetaryGearEnabled) {
         primeGearMultiplier = 0
     }
 
@@ -438,6 +445,7 @@ function updateParams() {
     else {
         neededRounds = Math.ceil(Math.min(turntable, normGear) / gcd(turntable, normGear)) * primeGear
     }
+
 }
 
 function reset() {
@@ -449,9 +457,17 @@ function reset() {
     calculatePoint(0, false, true)
 }
 
+function validateNeededRounds() {
+    if(neededRounds >= 230) {
+        return confirm("Needed rounds exceeds 230, this can take very long...");
+    }
+    return true
+}
+
 function immediate() {
     stop()
     updateParams()
+    if(!validateNeededRounds()) return;
     drawInfo()
     currentRounds = 0
     points = []
@@ -471,6 +487,7 @@ function restart() {
     }
 
     updateParams()
+    if(!validateNeededRounds()) return;
 
     currentRounds = 0
     points = []
@@ -633,4 +650,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('resize', resize);
     resize();
+
+    canvasWidth = document.getElementById('c').clientWidth;
+    canvasHeight = document.getElementById('c').clientHeight;
+
+    turntableLocationX = canvasWidth / 2;
+    turntableLocationY = 500;
+
+    primeDotStartX = canvasWidth / 2 - 400;
+    primeDotStartY = 200;
+
+    normDotStartX = canvasWidth / 2 + 400;
+    normDotStartY = 200;
+
+    turntableRadius = 400;
+    gearSize60 = 100;
+
+    calculatePoint(0, false, true);
 });
