@@ -44,6 +44,11 @@ let animationHandle = null
 
 let isStopped = false
 
+let controls = {
+    'primeGearMultiplicator': { x: null, y: null },
+    'normGearMultiplicator': { x: null, y: null }
+}
+
 function isDarkMode() {
     return document.body && document.body.classList.contains('dark-mode')
 }
@@ -61,7 +66,7 @@ function getStrokeColor() {
 }
 
 function getControlColor() {
-    return isDarkMode() ? '#9bb5d9' : 'gray'
+    return isDarkMode() ? '#3586f8' : '#003c91'
 }
 
 function drawInfo() {
@@ -120,7 +125,6 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     const turntableX = Math.sin(rounds * 2 * Math.PI * (reverseTurntable ? -1 : 1))
 
 
-
     if (!skipDraw) {
         // ctx.reset()
         ctx.fillStyle = getCanvasBackgroundColor()
@@ -137,8 +141,6 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
 
     if (!skipDraw)
         drawPattern()
-
-
 
 
     let primeDotCurrentX = primeDotStartX + primeX * gearSize60 / 60 * primeGear * primeGearMultiplier
@@ -225,12 +227,21 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     const targetPointX = midpointAxisX + rodLength * d2x / d2Distance
     const targetPointY = midpointAxisY + rodLength * d2y / d2Distance
 
+    const rodMidpointX = (midpointAxisX + targetPointX) / 2
+    const rodMidpointY = (midpointAxisY + targetPointY) / 2
+
+    controls.primeGearMultiplicator = { x: primeDotCurrentX, y: primeDotCurrentY }
+    controls.normGearMultiplicator = { x: normDotCurrentX, y: normDotCurrentY }
+    controls.targetPoint = { x: targetPointX, y: targetPointY }
+    controls.midpointAxis = { x: midpointAxisX, y: midpointAxisY }
+    controls.rodMidpoint = { x: rodMidpointX, y: rodMidpointY }
 
     if (!skipDraw && drawControls) {
 
         ctx.fillStyle = getControlColor()
         ctx.lineWidth = 1
         ctx.font = '12px Arial'
+
         ctx.fillText(primeGear.toString(), primeDotStartX, primeDotStartY)
         ctx.fillText(normGear.toString(), normDotStartX, normDotStartY)
         ctx.fillText(turntable.toString(), turntableLocationX, turntableLocationY - turntableRadius - 20)
@@ -239,41 +250,59 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
         ctx.strokeStyle = getControlColor()
         ctx.fillStyle = getControlColor()
 
+        // Draw prime gear cricle
         ctx.beginPath()
         ctx.arc(primeDotStartX, primeDotStartY, gearSize60 / 60 * primeGear * primeGearMultiplier, 0, 2 * Math.PI)
         ctx.stroke()
 
 
+        // draw prime gear anchor point
         ctx.beginPath()
         ctx.arc(primeDotCurrentX, primeDotCurrentY, 2, 0, 2 * Math.PI)
         ctx.fill()
 
 
+        // draw normal gear circle
         ctx.beginPath()
         ctx.arc(normDotStartX, normDotStartY, gearSize60 / 60 * normGear * normGearMultiplier, 0, 2 * Math.PI)
         ctx.stroke()
 
 
+        // draw normal gear anchor point
         ctx.beginPath()
         ctx.arc(normDotCurrentX, normDotCurrentY, 2, 0, 2 * Math.PI)
         ctx.fill()
 
+        if (anchor === "Normal") {
+            ctx.beginPath()
+            ctx.arc(normDotCurrentX, normDotCurrentY, 8, 0, 2 * Math.PI)
+            ctx.stroke()
+        } else {
+            ctx.beginPath()
+            ctx.arc(primeDotCurrentX, primeDotCurrentY, 8, 0, 2 * Math.PI)
+            ctx.stroke()
+        }
 
+        // draw turntable circle
         ctx.beginPath()
         ctx.arc(turntableLocationX, turntableLocationY, turntableRadius, 0, 2 * Math.PI)
         ctx.stroke()
 
+        // draw turntable center point
         ctx.fillStyle = getControlColor()
         ctx.beginPath()
         ctx.arc(turntableLocationX, turntableLocationY, 2, 0, 2 * Math.PI)
         ctx.fill()
 
 
+        // draw turntable round indicator point
         ctx.beginPath()
         ctx.arc(turntableCurrentX, turntableCurrentY, 2, 0, 2 * Math.PI)
         ctx.fill()
 
 
+
+        // draw line from prime gear anchor to normal gear anchor
         ctx.beginPath()
         ctx.moveTo(primeDotCurrentX, primeDotCurrentY)
         ctx.lineTo(normDotCurrentX, normDotCurrentY)
@@ -281,12 +310,22 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
 
 
         ctx.beginPath()
+        ctx.arc(midpointAxisX, midpointAxisY, 2, 0, 2 * Math.PI)
+        ctx.fill()
+
+        // draw line from midpoint axis to target point
+        ctx.beginPath()
         ctx.moveTo(midpointAxisX, midpointAxisY)
         ctx.lineTo(targetPointX, targetPointY)
         ctx.stroke()
+
+        ctx.beginPath()
+        ctx.arc(rodMidpointX, rodMidpointY, 2, 0, 2 * Math.PI)
+        ctx.fill()
     }
 
-    if (!skipDraw && rounds < neededRounds) {
+    if ((!skipDraw && rounds < neededRounds) || drawControls) {
+        // draw target point
         ctx.fillStyle = getControlColor()
         ctx.beginPath()
         ctx.arc(targetPointX, targetPointY, 2, 0, 2 * Math.PI)
@@ -373,9 +412,18 @@ function loadSettings() {
 }
 
 
-function updateParams() {
-    canvas = document.getElementById('c');
-    ctx = canvas.getContext('2d');
+let updateParamsBlockage = false
+
+function updateUIFromParams() {
+    document.getElementById('primeGearMultiplier').value = primeGearMultiplier
+    document.getElementById('normGearMultiplier').value = normGearMultiplier
+    document.getElementById('rodLength').value = rodLength
+    document.getElementById('rodX').value = rodX
+    document.getElementById('rodAngle').value = rodAngle
+}
+
+function updateParamsFromUI() {
+    if (updateParamsBlockage) return
 
     primeGear = parseInt(document.getElementById('primeGear').value)
     normGear = parseInt(document.getElementById('normGear').value)
@@ -439,18 +487,23 @@ function updateParams() {
 
     localStorage.setItem('settings', JSON.stringify(settings))
 
+
+
+}
+
+function calculateNeededRounds() {
     if (planetaryGearEnabled) {
         neededRounds = Math.ceil(Math.min(turntable, normGear) / gcd(turntable, normGear)) * planetaryOuterGear
     }
     else {
         neededRounds = Math.ceil(Math.min(turntable, normGear) / gcd(turntable, normGear)) * primeGear
     }
-
 }
 
 function reset() {
     stop()
-    updateParams()
+    // updateParams()
+    calculateNeededRounds()
     currentRounds = 0
     points = []
     drawInfo()
@@ -458,7 +511,7 @@ function reset() {
 }
 
 function validateNeededRounds() {
-    if(neededRounds >= 230) {
+    if (neededRounds >= 230) {
         return confirm("Needed rounds exceeds 230, this can take very long...");
     }
     return true
@@ -466,8 +519,9 @@ function validateNeededRounds() {
 
 function immediate() {
     stop()
-    updateParams()
-    if(!validateNeededRounds()) return;
+    // updateParams()
+    calculateNeededRounds()
+    if (!validateNeededRounds()) return;
     drawInfo()
     currentRounds = 0
     points = []
@@ -486,8 +540,9 @@ function restart() {
         window.cancelAnimationFrame(animationHandle)
     }
 
-    updateParams()
-    if(!validateNeededRounds()) return;
+    // updateParams()
+    calculateNeededRounds()
+    if (!validateNeededRounds()) return;
 
     currentRounds = 0
     points = []
@@ -578,12 +633,14 @@ function bindSlider(rangeId, needsResetOnChange) {
 
     rangeInput.addEventListener('input', () => {
         applyRangeValue(Number(rangeInput.value));
+        updateParamsFromUI()
         if (needsResetOnChange) reset()
     });
 
     valueInput.addEventListener('input', () => {
         if (valueInput.value === '') return;
         applyRangeValue(Number(valueInput.value));
+        updateParamsFromUI()
         if (needsResetOnChange) reset()
     });
 
@@ -623,6 +680,10 @@ function resize() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+
+    canvas = document.getElementById('c');
+    ctx = canvas.getContext('2d');
+
     const primeGearInput = document.getElementById('primeGear');
     primeGearInput.value = nearestPrime(Number(primeGearInput.value));
 
@@ -645,7 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
         applyTheme(nextTheme);
     });
 
-    updateParams();
+    updateParamsFromUI();
     calculatePoint(0, false, true);
 
     window.addEventListener('resize', resize);

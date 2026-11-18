@@ -177,15 +177,20 @@
                         value="60"><input class="value" type="number" min="1" max="180" step="1" value="60"
                         data-slider="turntable"></label>
 
-                <label class="control"><span>Anchor</span><select id="anchor">
+                <label class="control"><span>Anchor</span><select 
+                    onchange="(() => {
+                        updateParams(); 
+                        if(!animationHandle) calculatePoint(currentRounds, false, true)
+                    })()"
+                    id="anchor">
                         <option>Prime</option>
                         <option selected>Normal</option>
                     </select></label>
 
-                <label class="control"><span>Prime ×</span><input id="primeGearMultiplier" step="0.1" type="range"
+                <label class="control"><span>Prime ×</span><input id="primeGearMultiplier" step="0.001" type="range"
                         min="0" max="10" value="2"><input class="value" type="number" min="0" max="10" step="0.1"
                         value="1" data-slider="primeGearMultiplier"></label>
-                <label class="control"><span>Norm ×</span><input id="normGearMultiplier" step="0.1" type="range" min="0"
+                <label class="control"><span>Norm ×</span><input id="normGearMultiplier" step="0.001" type="range" min="0"
                         max="10" value="2"><input class="value" type="number" min="0" max="10" step="0.1" value="1"
                         data-slider="normGearMultiplier"></label>
 
@@ -213,7 +218,7 @@
             </div>
             <div class="panel">
 
-                <label class="control"><span>Rod %</span><input id="rodLength" type="range" min="-1000" max="1000"
+                <label class="control"><span>Rod Len</span><input id="rodLength" type="range" min="-1000" max="1000"
                         value="255"><input class="value" type="number" min="-1000" max="1000" step="1" value="100"
                         data-slider="rodLength"></label>
                 <label class="control"><span>Rod X</span><input id="rodX" type="range" min="0" max="1000"
@@ -238,8 +243,7 @@
 
                 <label class="control">
                     <span>Controls</span>
-                    <input onclick="(() => {
-                        updateParams(); 
+                    <input onclick="(() => { 
                         if(!animationHandle) calculatePoint(currentRounds, false, true)
                     })()" type="checkbox" id="drawControls" checked />
                 </label>
