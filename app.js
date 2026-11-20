@@ -1,6 +1,8 @@
 let canvas = null
 let ctx = null
 
+let pixelRatio = window.devicePixelRatio || 1
+
 let defaultDraggables = {
     leftGear: { x: 100, y: 100, moveAlso: ['leftGearPivotPoint'] },
     rightGear: { x: 900, y: 100, moveAlso: ['rightGearPivotPoint', 'planetaryGearPivotPoint'] },
@@ -309,6 +311,11 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     // claw stuff
     const pivotPointsDistance = calculateDistance(leftGearPivotX, leftGearPivotY, rightGearPivotX, rightGearPivotY)
 
+    const maxPossiblePivotDistance =
+        calculateDistance(drawingParameters.leftGear.x, drawingParameters.leftGear.y, drawingParameters.rightGear.x, drawingParameters.rightGear.y)
+        + (draggables.leftGearPivotPoint.y - drawingParameters.leftGear.y) +
+        (draggables.rightGearPivotPoint.y - drawingParameters.rightGear.y)
+
     const leftClawLengthToIntersection = drawingParameters.claw.leftArm.lengthToIntersection
     const rightClawLengthToIntersection = drawingParameters.claw.rightArm.lengthToIntersection
 
@@ -456,6 +463,9 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
         ctx.stroke()
         if (drawingParameters.armType === 'SuperClaw') {
 
+            if (leftClawLengthToIntersection + rightClawLengthToIntersection < maxPossiblePivotDistance) {
+                ctx.strokeStyle = 'red'
+            }
             ctx.beginPath()
             ctx.arc(clawTarget.x, clawTarget.y, 2, 0, 2 * Math.PI)
             ctx.fill()
@@ -479,9 +489,15 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
             ctx.beginPath()
             ctx.arc(extendedRightClaw.x, extendedRightClaw.y, 2, 0, 2 * Math.PI)
             ctx.fill()
+            ctx.strokeStyle = getStrokeColor()
         }
 
         else if (drawingParameters.armType === 'Claw') {
+
+            if (leftClawLengthToIntersection + rightClawLengthToIntersection < maxPossiblePivotDistance) {
+                ctx.strokeStyle = 'red'
+            }
+
             ctx.beginPath()
             ctx.moveTo(leftGearPivotX, leftGearPivotY)
 
@@ -500,6 +516,7 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
             )
             ctx.stroke()
 
+            ctx.strokeStyle = getStrokeColor()
 
 
         } else {
@@ -707,17 +724,17 @@ function updateDrawingSettingsFromDraggables() {
     // const leftArmX = Math.cos(leftPivotPenPointAngle - pivotPointAngle) * leftPivotPenDistance
     // const rightArmX = Math.cos(rightPivotPenPointAngle - pivotPointAngle - Math.PI) * rightPivotPenDistance
 
+    const angle2 = Math.atan2(intersection.y - draggables.simpleArmTipPoint.y, intersection.x - draggables.simpleArmTipPoint.x)
 
     if (drawingParameters.anchor === 'Left') {
         drawingParameters.simpleArm.x = leftArmX
         drawingParameters.simpleArm.length = leftArmLength
-        drawingParameters.simpleArm.angle = leftArmAngle
+        drawingParameters.simpleArm.angle = angle2 - pivotPointAngle + Math.PI
     } else {
         drawingParameters.simpleArm.x = rightArmX
         drawingParameters.simpleArm.length = rightArmLength
-        drawingParameters.simpleArm.angle = leftArmAngle
+        drawingParameters.simpleArm.angle = angle2 - pivotPointAngle + Math.PI
     }
-
 
 
 
@@ -732,11 +749,14 @@ function updateDrawingSettingsFromDraggables() {
         rightGearPivotY = draggables.planetaryGearPivotPoint.y
     }
 
-
     const pivotPointsDistance = calculateDistance(leftGearPivotX, leftGearPivotY, rightGearPivotX, rightGearPivotY)
 
     const leftClawLengthToIntersection = calculateDistance(leftGearPivotX, leftGearPivotY, draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y)
     const rightClawLengthToIntersection = calculateDistance(rightGearPivotX, rightGearPivotY, draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y)
+
+    drawingParameters.claw.leftArm.lengthToIntersection = leftClawLengthToIntersection
+    drawingParameters.claw.rightArm.lengthToIntersection = rightClawLengthToIntersection
+
 
     drawingParameters.claw.leftArm.lengthToIntersection = leftClawLengthToIntersection
     drawingParameters.claw.rightArm.lengthToIntersection = rightClawLengthToIntersection
@@ -759,6 +779,9 @@ function updateDrawingSettingsFromDraggables() {
 
     drawingParameters.claw.leftArm.scissorLength = calculateDistance(leftArmExtension.x, leftArmExtension.y, draggables.clawEndPoint.x, draggables.clawEndPoint.y)
     drawingParameters.claw.rightArm.scissorLength = calculateDistance(rightArmExtension.x, rightArmExtension.y, draggables.clawEndPoint.x, draggables.clawEndPoint.y)
+
+
+
 
 }
 
@@ -1057,21 +1080,33 @@ function applyTheme(themeName) {
 
 function resize() {
     const canvasContainer = document.querySelector('.canvas-container');
-    const width = canvasContainer ? canvasContainer.clientWidth : document.documentElement.clientWidth;
-    const height = canvasContainer ? canvasContainer.clientHeight : document.documentElement.clientHeight;
+    let width = canvasContainer ? canvasContainer.clientWidth : document.documentElement.clientWidth;
+    let height = canvasContainer ? canvasContainer.clientHeight : document.documentElement.clientHeight;
 
     const canvas = document.getElementById('c');
     if (canvas) {
-        canvas.width = width;
-        canvas.height = height;
 
-        if (!animationHandle) {
-            calculatePoint(0, false, true);
+        canvas.style.width = width + 'px'
+        canvas.style.height = height + 'px'
+
+        width = Math.round(width * pixelRatio)
+        height = Math.round(height * pixelRatio)
+
+        if (canvas.width != width || canvas.height != height) {
+            canvas.width = width;
+            canvas.height = height;
+            ctx = canvas.getContext('2d');
+            ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+
+            if (!animationHandle) {
+                calculatePoint(0, false, true);
+            }
         }
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+
+function initialize() {
 
     canvas = document.getElementById('c');
     ctx = canvas.getContext('2d');
@@ -1120,4 +1155,6 @@ document.addEventListener('DOMContentLoaded', () => {
     gearSize60 = 100;
 
     calculatePoint(0, false, true);
-});
+}
+
+document.addEventListener('DOMContentLoaded', initialize);

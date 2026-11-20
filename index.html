@@ -4,6 +4,7 @@
     <title>Online Cyclograph Simulator</title>
     <meta charset="UTF-8">
     <meta name="description" content="Online Cyclograph Simulator">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         :root {
             --bg: #f4f4f4;
@@ -158,6 +159,15 @@
             transition: background 0.2s ease;
 
         }
+
+        @media (max-width: 768px) {
+            .content {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 
@@ -211,7 +221,7 @@
                     <input onchange="updateParamsFromUI()" id="reverseTurntable" type="checkbox"></label>
 
 
-                 <label class="control checkbox">
+                <label class="control checkbox">
                     <span>Disable Turntable</span>
                     <input onchange="updateParamsFromUI()" id="disableTurntable" type="checkbox"></label>
 
@@ -238,14 +248,14 @@
             </div>
             <div class="panel">
 
-                    <label class="control">
+                <label class="control">
                     <span>Arm</span>
                     <select onchange="(() => {
                         updateParamsFromUI(); 
                     })()" id="arm">
                         <option selected>Simple</option>
                         <option>Claw</option>
-                        <option >SuperClaw</option>
+                        <option>SuperClaw</option>
                     </select></label>
 
 
@@ -259,11 +269,11 @@
                     <input id="rodX" type="range" min="0" max="1000" value="500"><input class="value" type="number"
                         min="0" max="1000" step="1" value="500" data-slider="rodX"></label>
 
-                          <label class="control">
+                <label class="control">
                     <span>Rod Angle</span>
-                    <input id="rodAngle" type="range" min="-1000" max="1000" value="0" step="0.001"><input class="value" type="number"
-                        min="-1000" max="1000" step="0.001" value="0" data-slider="rodAngle"></label>
-               
+                    <input id="rodAngle" type="range" min="-1000" max="1000" value="0" step="0.001"><input class="value"
+                        type="number" min="-1000" max="1000" step="0.001" value="0" data-slider="rodAngle"></label>
+
             </div>
             <div class="panel">
                 <label class="control">
@@ -323,8 +333,33 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
-    <script src="canvas-pan.js"></script>
+    <script>
+        const scripts = ["app.js", "canvas-pan.js"]
+        const bust = new Date().getTime()
+        let loadedScripts = 0;
+        for (const script of scripts) {
+            const s = document.createElement('script');
+            
+            s.src = `${script}?t=${bust}`;
+            s.onload = () => {
+                console.log(`${script} loaded`);
+                loadedScripts++;
+                if (loadedScripts === scripts.length) {
+                    console.log('All scripts loaded');
+                    if (typeof initialize === 'function') {
+                        initialize();
+                        if (typeof initializeCanvasPan === 'function') {
+                            initializeCanvasPan();
+                        }
+                    }
+                }
+            };
+            document.body.appendChild(s);
+        }
+    </script>
+
+    <!-- <script src="app.js"></script>
+    <script src="canvas-pan.js"></script> -->
 
 </body>
 
