@@ -168,13 +168,13 @@
 
             <div class="panel">
                 <label class="control">
-                    <span>Prime</span>
-                    <input id="primeGear" type="range" min="1" max="80" value="43"><input class="value" type="number"
-                        min="1" max="80" step="1" value="23" data-slider="primeGear"></label>
+                    <span>Left</span>
+                    <input id="leftGear" type="range" min="1" max="80" value="43"><input class="value" type="number"
+                        min="1" max="80" step="1" value="23" data-slider="leftGear"></label>
                 <label class="control">
-                    <span>Normal</span>
-                    <input id="normGear" type="range" min="1" max="120" value="40"><input class="value" type="number"
-                        min="1" max="120" step="1" value="60" data-slider="normGear"></label>
+                    <span>Right</span>
+                    <input id="rightGear" type="range" min="1" max="120" value="40"><input class="value" type="number"
+                        min="1" max="120" step="1" value="60" data-slider="rightGear"></label>
                 <label class="control">
                     <span>Turntable</span>
                     <input id="turntable" type="range" min="1" max="180" value="60"><input class="value" type="number"
@@ -185,27 +185,27 @@
                     <select onchange="(() => {
                         updateParamsFromUI(); 
                     })()" id="anchor">
-                        <option>Prime</option>
-                        <option selected>Normal</option>
+                        <option>Left</option>
+                        <option selected>Right</option>
                     </select></label>
 
                 <label class="control">
-                    <span>Prime ×</span>
-                    <input id="primeGearMultiplier" step="0.001" type="range" min="0" max="10" value="2"><input
-                        class="value" type="number" min="0" max="10" step="0.1" value="1"
-                        data-slider="primeGearMultiplier"></label>
+                    <span>Left Radius</span>
+                    <input id="leftGearRadius" step="0.001" type="range" min="0" max="500" value="100"><input
+                        class="value" type="number" min="0" max="500" step="0.1" value="100"
+                        data-slider="leftGearRadius"></label>
                 <label class="control">
-                    <span>Norm ×</span>
-                    <input id="normGearMultiplier" step="0.001" type="range" min="0" max="10" value="2"><input
-                        class="value" type="number" min="0" max="10" step="0.1" value="1"
-                        data-slider="normGearMultiplier"></label>
+                    <span>Right Radius</span>
+                    <input id="rightGearRadius" step="0.001" type="range" min="0" max="500" value="100"><input
+                        class="value" type="number" min="0" max="500" step="0.1" value="100"
+                        data-slider="rightGearRadius"></label>
 
                 <label class="control checkbox">
-                    <span>Reverse Normgear</span>
-                    <input onchange="updateParamsFromUI()" id="reverseNormgear" type="checkbox"></label>
+                    <span>Reverse Right</span>
+                    <input onchange="updateParamsFromUI()" id="reverseRightGear" type="checkbox"></label>
                 <label class="control checkbox">
-                    <span>Reverse Primegear</span>
-                    <input onchange="updateParamsFromUI()" id="reversePrimegear" type="checkbox"></label>
+                    <span>Reverse Left</span>
+                    <input onchange="updateParamsFromUI()" id="reverseLeftGear" type="checkbox"></label>
                 <label class="control checkbox">
                     <span>Reverse Turntable</span>
                     <input onchange="updateParamsFromUI()" id="reverseTurntable" type="checkbox"></label>
@@ -238,6 +238,18 @@
             </div>
             <div class="panel">
 
+                    <label class="control">
+                    <span>Arm</span>
+                    <select onchange="(() => {
+                        updateParamsFromUI(); 
+                    })()" id="arm">
+                        <option>Simple</option>
+                        <option>Claw</option>
+                        <option selected>SuperClaw</option>
+                    </select></label>
+
+
+
                 <label class="control">
                     <span>Rod Len</span>
                     <input id="rodLength" type="range" min="-1000" max="1000" value="255"><input class="value"
@@ -246,10 +258,12 @@
                     <span>Rod X</span>
                     <input id="rodX" type="range" min="0" max="1000" value="500"><input class="value" type="number"
                         min="0" max="1000" step="1" value="500" data-slider="rodX"></label>
-                <label class="control">
-                    <span>Angle</span>
-                    <input id="rodAngle" type="range" min="-180" max="180" value="96"><input class="value" type="number"
-                        min="-180" max="180" step="1" value="90" data-slider="rodAngle"></label>
+
+                          <label class="control">
+                    <span>Rod Angle</span>
+                    <input id="rodAngle" type="range" min="-1000" max="1000" value="0" step="0.001"><input class="value" type="number"
+                        min="-1000" max="1000" step="0.001" value="0" data-slider="rodAngle"></label>
+               
             </div>
             <div class="panel">
                 <label class="control">

@@ -25,16 +25,28 @@ window.onload = () => {
         isDragging = true;
         dragStartPosition = getTransformedPoint(event.offsetX, event.offsetY);
 
+        let minDistance = Infinity;
+        let minDistanceControl = null;
 
-        for (let k of Object.keys(controls)) {
+        for (let k of Object.keys(draggables)) {
+            if (draggables[k].showWhen && !draggables[k].showWhen(drawingParameters)) {
+                continue;
+            }
+
             const distance = Math.sqrt(
-                Math.pow(currentTransformedCursor.x - controls[k].x, 2) +
-                Math.pow(currentTransformedCursor.y - controls[k].y, 2)
+                Math.pow(currentTransformedCursor.x - draggables[k].x, 2) +
+                Math.pow(currentTransformedCursor.y - draggables[k].y, 2)
             );
 
-            if (distance < 10) {
-                clickedControl = k;
+            if (distance < minDistance) {
+                minDistance = distance;
+                minDistanceControl = draggables[k];
             }
+        }
+
+        if (minDistanceControl && minDistance < 20) {
+            clickedControl = minDistanceControl;
+            reset();
         }
     }
 
@@ -45,90 +57,35 @@ window.onload = () => {
 
         if (isDragging) {
             if (clickedControl) {
-                const control = controls[clickedControl];
 
-                if (control === controls.primeGearMultiplicator) {
-                    if (planetaryGearEnabled) return;
+                const newX = clickedControl.x + (currentTransformedCursor.x - dragStartPosition.x);
+                const newY = clickedControl.y + (currentTransformedCursor.y - dragStartPosition.y);
 
-                    const primeGearSize = gearSize60 / 60 * primeGear * primeGearMultiplier * currentZoom;
-                    const newGearSize = primeGearSize + (currentTransformedCursor.y - dragStartPosition.y);
-                    const newPrimeGearMultiplier = newGearSize / (gearSize60 / 60 * primeGear * currentZoom);
-                    // document.getElementById('primeGearMultiplier').value = newPrimeGearMultiplier;
-                    // updateParams();
-                    primeGearMultiplier = Math.max(0, newPrimeGearMultiplier);
-                    dragStartPosition = getTransformedPoint(event.offsetX, event.offsetY);
+                if (clickedControl.allowX !== false) {
+                    clickedControl.x = newX;
                 }
-                if (control === controls.normGearMultiplicator) {
-                    const normGearSize = gearSize60 / 60 * normGear * normGearMultiplier * currentZoom;
-                    const newGearSize = normGearSize + (currentTransformedCursor.y - dragStartPosition.y);
-                    const newNormGearMultiplier = newGearSize / (gearSize60 / 60 * normGear * currentZoom);
-                    normGearMultiplier = Math.max(0, newNormGearMultiplier);
-                    // document.getElementById('normGearMultiplier').value = newNormGearMultiplier;
-                    // updateParams();
-                    dragStartPosition = getTransformedPoint(event.offsetX, event.offsetY);
+                if (clickedControl.allowY !== false) {
+                    clickedControl.y = newY;
                 }
-                if (control === controls.midpointAxis) {
-                    let factor = anchor === "Normal" ? -1 : 1;
-                    let newRodX = rodX + (currentTransformedCursor.x - dragStartPosition.x) * factor;
-                    rodX = newRodX;
-                    // document.getElementById('rodX').value = newRodX;
-                    // updateParams();
-                    // You can add any specific logic for midpoint axis manipulation here if needed
-                    dragStartPosition = getTransformedPoint(event.offsetX, event.offsetY);
-                }
-                if (control === controls.targetPoint) {
-                    if (armType === 'SuperClaw') {
-                        let newPrimeSuperClawExtension = primeSuperClawScissorLength + (currentTransformedCursor.x - dragStartPosition.x);
-                        primeSuperClawScissorLength = newPrimeSuperClawExtension;
-                        let newNormSuperClawExtension = normSuperClawScissorLength + (currentTransformedCursor.y - dragStartPosition.y);
-                        normSuperClawScissorLength = newNormSuperClawExtension;
-                        // document.getElementById('primeSuperClawExtension').value = newPrimeSuperClawExtension;
-                        // updateParams();
-                        dragStartPosition = getTransformedPoint(event.offsetX, event.offsetY);
-
-                    } else {
-
-                        let factor = anchor === "Normal" ? -1 : 1;
-                        let newRodY = rodLength + (currentTransformedCursor.y - dragStartPosition.y) * factor;
-                        rodLength = newRodY;
-
-                        let newRodX = rodX + (currentTransformedCursor.x - dragStartPosition.x) * factor;
-                        rodX = newRodX;
-                        // document.getElementById('rodLength').value = newRodY;
-                        // updateParams();
-                        // You can add any specific logic for target point manipulation here if needed
-                        dragStartPosition = getTransformedPoint(event.offsetX, event.offsetY);
+                if (clickedControl.moveAlso) {
+                    for (let moveKey of clickedControl.moveAlso) {
+                        if (draggables[moveKey]) {
+                            if (clickedControl.allowX !== false) {
+                                draggables[moveKey].x = draggables[moveKey].x + (currentTransformedCursor.x - dragStartPosition.x);
+                            }
+                            if (clickedControl.allowY !== false) {
+                                draggables[moveKey].y = draggables[moveKey].y + (currentTransformedCursor.y - dragStartPosition.y);
+                            }
+                        }
                     }
-
-                }
-                if (control === controls.rodMidpoint) {
-                    // let factor = anchor === "Normal" ? 1 : -1;
-                    let newRoDangle = rodAngle + (currentTransformedCursor.x - dragStartPosition.x) * -1;
-                    // document.getElementById('rodAngle').value = newRoDangle;
-                    rodAngle = newRoDangle;
-                    // updateParams();
-                    dragStartPosition = getTransformedPoint(event.offsetX, event.offsetY);
-                }
-                if (control === controls.clawIntersection) {
-                    let newPrimeClawIntersectionLength = primeClawIntersectionLength + (currentTransformedCursor.x - dragStartPosition.x);
-                    primeClawIntersectionLength = newPrimeClawIntersectionLength;
-                    let newNormClawIntersectionLength = normClawIntersectionLength + (currentTransformedCursor.y - dragStartPosition.y);
-                    normClawIntersectionLength = newNormClawIntersectionLength;
-                    dragStartPosition = getTransformedPoint(event.offsetX, event.offsetY);
                 }
 
-                if (control === controls.superClawPrimeExtension) {
-                    let newPrimeSuperClawExtensionLength = primeSuperClawExtension + (currentTransformedCursor.x - dragStartPosition.x);
-                    primeSuperClawExtension = Math.max(0, newPrimeSuperClawExtensionLength);
-                    dragStartPosition = getTransformedPoint(event.offsetX, event.offsetY);
-                }
-                if (control === controls.superClawNormExtension) {
-                    let newNormSuperClawExtensionLength = normSuperClawExtension + (currentTransformedCursor.y - dragStartPosition.y);
-                    normSuperClawExtension = Math.max(0, newNormSuperClawExtensionLength);
-                    dragStartPosition = getTransformedPoint(event.offsetX, event.offsetY);
-                }
+                dragStartPosition = getTransformedPoint(event.offsetX, event.offsetY);
+
+                updateDrawingSettingsFromDraggables()
                 updateUIFromParams()
                 storeSettings()
+
                 calculatePoint(currentRounds, false, true)
             } else {
                 context.translate(currentTransformedCursor.x - dragStartPosition.x, currentTransformedCursor.y - dragStartPosition.y);

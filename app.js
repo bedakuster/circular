@@ -1,54 +1,51 @@
 let canvas = null
 let ctx = null
 
-let turntableLocationX = 500
-let turntableLocationY = 500
-let turntableRadius = 400
 
-let primeDotStartY = 200
-let primeDotStartX = 100
+let draggables = {
+    leftGear: { x: 100, y: 100, moveAlso: ['leftGearPivotPoint'] },
+    rightGear: { x: 900, y: 100, moveAlso: ['rightGearPivotPoint', 'planetaryGearPivotPoint'] },
+    leftGearPivotPoint: { x: 100, y: 200, allowX: false },
+    rightGearPivotPoint: { x: 900, y: 200, allowX: false, moveAlso: ['planetaryGearPivotPoint'] },
+    simpleArmAnglePoint: { x: 500, y: 500, showWhen: (settings) => settings.armType === 'Simple' },
+    simpleArmTipPoint: { x: 500, y: 600, moveAlso: ['simpleArmAnglePoint'], showWhen: (settings) => settings.armType === 'Simple' },
+    planetaryGearPivotPoint: { x: 900, y: 300, allowX: false, showWhen: (settings) => settings.planetaryGear.enabled },
+    clawIntersectionPoint: { x: 500, y: 400, moveAlso: ['clawEndPoint', 'leftClawEnd', 'rightClawEnd'], showWhen: (settings) => settings.armType === 'Claw' || settings.armType === 'SuperClaw' },
+    leftClawEnd: { x: 600, y: 600, showWhen: (settings) => settings.armType === 'SuperClaw' },
+    rightClawEnd: { x: 400, y: 600, showWhen: (settings) => settings.armType === 'SuperClaw' },
+    clawEndPoint: { x: 500, y: 600, showWhen: (settings) => settings.armType === 'SuperClaw' }
+}
 
-let normDotStartY = 200
-let normDotStartX = 900
+let drawingParameters = {
+    leftGear: {
+        x: 100, y: 100, teeth: 31, reversed: false, draggable: true
+    },
+    rightGear: {
+        x: 900, y: 100, teeth: 40, reversed: false, draggable: true
+    },
+    anchor: 'Left',
+    armType: "Simple",
+    turntable: {
+        x: 500, y: 500, radius: 400, teeth: 60, reversed: false, disabled: false
+    },
+    planetaryGear: {
+        innerGear: 120,
+        outerGear: 29,
+        radius: 100,
+        enabled: false
+    },
+    stepSize: 0.005,
+    speed: 1,
+    leftGearPivotPoint: { draggable: true, x: 100, y: 200 },
+    rightGearPivotPoint: { draggable: true, x: 900, y: 200 },
 
-let primeGear = 23
-let primeGearMultiplier = 1
+    simpleArm: { x: 0, length: 0 },
+    claw: {
+        leftArm: { lengthToIntersection: 0, extensionLength: 0, scissorLength: 0 },
+        rightArm: { lengthToIntersection: 0, extensionLength: 0, scissorLength: 0 }
+    }
+}
 
-let normGear = 60
-let normGearMultiplier = 1
-
-let rodLength = 400
-let rodX = 0.5
-let rodAngle = 90
-
-let clawPrimeLength = 200
-let clawNormLength = 200
-
-let reverseNormgear = false
-let reversePrimegear = false
-let reverseTurntable = false
-let disableTurntable = false
-
-let planetaryGearEnabled = true
-let planetaryInnerGear = 120
-let planetaryOuterGear = 29
-
-let gearSize60 = 100
-let turntable = 60
-
-let primeClawIntersectionLength = 500
-let normClawIntersectionLength = 500
-
-let primeSuperClawExtension = 100
-let normSuperClawExtension = 100
-
-let primeSuperClawScissorLength = 100
-let normSuperClawScissorLength = 100
-
-let anchor = 'Prime'
-
-// Arm type can be 'Simple' or 'Claw' or 'SuperClaw'
-let armType = 'SuperClaw'
 
 const gcd = (a, b) => (b === 0 ? Math.abs(a) : gcd(b, a % b));
 const keepEveryNthPoint = 2
@@ -60,12 +57,9 @@ let points = []
 let currentRounds = 0
 let animationHandle = null
 
-let isStopped = false
+let isStopped = true
 
-let controls = {
-    'primeGearMultiplicator': { x: null, y: null },
-    'normGearMultiplicator': { x: null, y: null }
-}
+
 
 function isDarkMode() {
     return document.body && document.body.classList.contains('dark-mode')
@@ -87,10 +81,14 @@ function getControlColor() {
     return isDarkMode() ? '#3586f8' : '#003c91'
 }
 
+function getTouchableColor() {
+    return isDarkMode() ? '#6bbcff' : '#001747'
+}
+
 function drawInfo() {
     const infoPanel = document.getElementById('info-panel')
     infoPanel.innerHTML = `
-        Progress: ${(currentRounds / neededRounds * 100).toFixed(2)}% | Rounds: ${currentRounds.toFixed(3)} / ${neededRounds} | Vertices: ${points.length} | GCD: ${gcd(turntable, normGear)} | Factor: ${turntable / gcd(turntable, normGear)}
+        Progress: ${(currentRounds / neededRounds * 100).toFixed(2)}% | Rounds: ${currentRounds.toFixed(3)} / ${neededRounds} | Vertices: ${points.length} | GCD: ${gcd(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth)} | Factor: ${drawingParameters.turntable.teeth / gcd(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth)}
     `
 }
 
@@ -168,8 +166,12 @@ function triangleHeight(a, b, c) {
     return 2 * area / c;
 }
 
+function calculateDistance(x1, y1, x2, y2) {
+    return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+}
+
 function clawPoint(primeDotCurrentX, primeDotCurrentY, normDotCurrentX, normDotCurrentY, primeLength, normLength) {
-    const pointDistance = Math.sqrt((primeDotCurrentX - normDotCurrentX) ** 2 + (primeDotCurrentY - normDotCurrentY) ** 2)
+    const pointDistance = calculateDistance(primeDotCurrentX, primeDotCurrentY, normDotCurrentX, normDotCurrentY)
 
     const primeClawIntersectionLength = primeLength
     const normClawIntersectionLength = normLength
@@ -202,17 +204,21 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
 
     drawInfo()
 
-    const primeRounds = turntable / primeGear * rounds * (reversePrimegear ? -1 : 1)
-    const normRounds = turntable / normGear * rounds * (reverseNormgear ? -1 : 1)
+    const leftGearRounds = drawingParameters.turntable.teeth / drawingParameters.leftGear.teeth * rounds * (drawingParameters.leftGear.reversed ? -1 : 1)
+    const rightGearRounds = drawingParameters.turntable.teeth / drawingParameters.rightGear.teeth * rounds * (drawingParameters.rightGear.reversed ? -1 : 1)
 
-    const primeY = Math.cos(primeRounds * 2 * Math.PI)
-    const primeX = Math.sin(primeRounds * 2 * Math.PI)
+    const leftGearRadius = calculateDistance(drawingParameters.leftGear.x, drawingParameters.leftGear.y, drawingParameters.leftGearPivotPoint.x, drawingParameters.leftGearPivotPoint.y)
+    const rightGearRadius = calculateDistance(drawingParameters.rightGear.x, drawingParameters.rightGear.y, drawingParameters.rightGearPivotPoint.x, drawingParameters.rightGearPivotPoint.y)
 
-    const normY = Math.cos(normRounds * 2 * Math.PI)
-    const normX = Math.sin(normRounds * 2 * Math.PI)
+    const leftGearYFactor = Math.cos(leftGearRounds * 2 * Math.PI)
+    const leftGearXFactor = Math.sin(leftGearRounds * 2 * Math.PI)
 
-    const turntableY = Math.cos(rounds * 2 * Math.PI * (disableTurntable ? 0 : (reverseTurntable ? -1 : 1)))
-    const turntableX = Math.sin(rounds * 2 * Math.PI * (disableTurntable ? 0 : (reverseTurntable ? -1 : 1)))
+    const rightGearYFactor = Math.cos(rightGearRounds * 2 * Math.PI)
+    const rightGearXFactor = Math.sin(rightGearRounds * 2 * Math.PI)
+
+    const turntableYFactor = Math.cos(rounds * 2 * Math.PI * (drawingParameters.turntable.disabled ? 0 : (drawingParameters.turntable.reversed ? -1 : 1)))
+    const turntableXFactor = Math.sin(rounds * 2 * Math.PI * (drawingParameters.turntable.disabled ? 0 : (drawingParameters.turntable.reversed ? -1 : 1)))
+
 
 
     if (!skipDraw) {
@@ -224,15 +230,14 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     // delete older intermediate points
     points = points.filter((p) => p.keep || p.i > realPointCount - 100)
 
-    if (!disableTurntable) {
+    if (!drawingParameters.turntable.disabled) {
 
         for (let i = 0; i < points.length; i++) {
             const p = points[i]
-            const rotatedPoint = rotatePointAroundPivot(p, turntableLocationX, turntableLocationY, (rounds - currentRounds) * (reverseTurntable ? -1 : 1))
+            const rotatedPoint = rotatePointAroundPivot(p, drawingParameters.turntable.x, drawingParameters.turntable.y, (rounds - currentRounds) * (drawingParameters.turntable.reversed ? -1 : 1))
 
             p.x = rotatedPoint.x
             p.y = rotatedPoint.y
-
 
         }
     }
@@ -242,35 +247,40 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
         drawPattern()
 
 
-    let primeDotCurrentX = primeDotStartX + primeX * gearSize60 / 60 * primeGear * primeGearMultiplier
-    const primeDotCurrentY = primeDotStartY + primeY * gearSize60 / 60 * primeGear * primeGearMultiplier
+    const leftGearPivotX = drawingParameters.leftGear.x + leftGearXFactor * leftGearRadius
+    const leftGearPivotY = drawingParameters.leftGear.y + leftGearYFactor * leftGearRadius
 
-    const normXWay = normX * gearSize60 / 60 * normGear * normGearMultiplier
+    drawingParameters.leftGearPivotPoint.x = leftGearPivotX
+    drawingParameters.leftGearPivotPoint.y = leftGearPivotY
+    // const normXWay = normX * gearSize60 / 60 * normGear * normGearMultiplier
 
-    let normDotCurrentX = normDotStartX + normX * gearSize60 / 60 * normGear * normGearMultiplier
-    let normDotCurrentY = normDotStartY + normY * gearSize60 / 60 * normGear * normGearMultiplier
+    let rightGearPivotX = drawingParameters.rightGear.x + rightGearXFactor * rightGearRadius
+    let rightGearPivotY = drawingParameters.rightGear.y + rightGearYFactor * rightGearRadius
 
-    const turntableCurrentX = turntableLocationX + turntableX * 400
-    const turntableCurrentY = turntableLocationY + turntableY * 400
+    drawingParameters.rightGearPivotPoint.x = rightGearPivotX
+    drawingParameters.rightGearPivotPoint.y = rightGearPivotY
+
+    const turntableCurrentX = drawingParameters.turntable.x + turntableXFactor * drawingParameters.turntable.radius
+    const turntableCurrentY = drawingParameters.turntable.y + turntableYFactor * drawingParameters.turntable.radius
 
     const drawControls = document.getElementById('drawControls').checked
 
 
-    if (planetaryGearEnabled) {
+    if (drawingParameters.planetaryGear.enabled) {
 
-        const planetaryOuterGearStartX = normDotCurrentX
-        const planetaryOuterGearStartY = normDotCurrentY
+        const planetaryOuterGearStartX = rightGearPivotX
+        const planetaryOuterGearStartY = rightGearPivotY
 
-        const planetaryOuterRounds = normRounds * (planetaryInnerGear + planetaryOuterGear) / planetaryOuterGear
+        const planetaryOuterRounds = rightGearRounds * (drawingParameters.planetaryGear.innerGear + drawingParameters.planetaryGear.outerGear) / drawingParameters.planetaryGear.outerGear
 
         const planetaryOuterGearMovX = Math.sin(planetaryOuterRounds * 2 * Math.PI)
         const planetaryOuterGearMovY = Math.cos(planetaryOuterRounds * 2 * Math.PI)
 
-        const planetaryOuterGearCurrentX = planetaryOuterGearStartX + planetaryOuterGearMovX * gearSize60 / 60 * planetaryOuterGear
-        const planetaryOuterGearCurrentY = planetaryOuterGearStartY + planetaryOuterGearMovY * gearSize60 / 60 * planetaryOuterGear
+        const planetaryOuterGearPivotX = planetaryOuterGearStartX + planetaryOuterGearMovX * drawingParameters.planetaryGear.radius
+        const planetaryOuterGearPivotY = planetaryOuterGearStartY + planetaryOuterGearMovY * drawingParameters.planetaryGear.radius
 
-        normDotCurrentX = planetaryOuterGearCurrentX
-        normDotCurrentY = planetaryOuterGearCurrentY
+        rightGearPivotX = planetaryOuterGearPivotX
+        rightGearPivotY = planetaryOuterGearPivotY
 
         // const planetaryOuterGearCurrent = rotatePointAroundPivot(planetaryOuterGearCenterX, planetaryOuterGearCenterY, planetaryInnerGearCenterX, planetaryInnerGearCenterY, (rounds - currentRounds) * (reverseNormgear ? -1 : 1))
 
@@ -279,11 +289,11 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
             ctx.strokeStyle = getControlColor()
 
             ctx.beginPath()
-            ctx.arc(planetaryOuterGearCurrentX, planetaryOuterGearCurrentY, 2, 0, 2 * Math.PI)
+            ctx.arc(planetaryOuterGearPivotX, planetaryOuterGearPivotY, 2, 0, 2 * Math.PI)
             ctx.fill()
 
             ctx.beginPath()
-            ctx.arc(planetaryOuterGearStartX, planetaryOuterGearStartY, gearSize60 / 60 * planetaryOuterGear, 0, 2 * Math.PI)
+            ctx.arc(planetaryOuterGearStartX, planetaryOuterGearStartY, drawingParameters.planetaryGear.radius, 0, 2 * Math.PI)
             ctx.stroke()
         }
 
@@ -293,81 +303,81 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     let targetPointX = 0, targetPointY = 0
 
     // claw stuff
-    const pointDistance = Math.sqrt((primeDotCurrentX - normDotCurrentX) ** 2 + (primeDotCurrentY - normDotCurrentY) ** 2)
+    const pivotPointsDistance = calculateDistance(leftGearPivotX, leftGearPivotY, rightGearPivotX, rightGearPivotY)
 
-    const primeClawTotalLength = primeClawIntersectionLength + primeSuperClawExtension
-    const normClawTotalLength = normClawIntersectionLength + normSuperClawExtension
+    const leftClawLengthToIntersection = drawingParameters.claw.leftArm.lengthToIntersection
+    const rightClawLengthToIntersection = drawingParameters.claw.rightArm.lengthToIntersection
 
-    const clawTarget = clawPoint(primeDotCurrentX, primeDotCurrentY, normDotCurrentX, normDotCurrentY, primeClawIntersectionLength, normClawIntersectionLength)
+    const clawTarget = clawPoint(leftGearPivotX, leftGearPivotY, rightGearPivotX, rightGearPivotY, leftClawLengthToIntersection, rightClawLengthToIntersection)
 
-    if (armType === 'Claw') {
+    if (drawingParameters.armType === 'Claw') {
         targetPointX = clawTarget.x
         targetPointY = clawTarget.y
     }
 
-    const extendedPrimeClaw = extendLine(primeDotCurrentX, primeDotCurrentY, clawTarget.l1Angle, primeClawTotalLength)
-    const extendedNormClaw = extendLine(normDotCurrentX, normDotCurrentY, clawTarget.l2Angle, normClawTotalLength)
+    const leftClawExtensionLength = drawingParameters.claw.leftArm.extensionLength
+    const rightClawExtensionLength = drawingParameters.claw.rightArm.extensionLength
 
-    const superClawTarget = clawPoint(extendedNormClaw.x, extendedNormClaw.y, extendedPrimeClaw.x, extendedPrimeClaw.y, normSuperClawScissorLength, primeSuperClawScissorLength)
+    const extendedLeftClaw = extendLine(clawTarget.x, clawTarget.y, clawTarget.l1Angle, leftClawExtensionLength)
+    const extendedRightClaw = extendLine(clawTarget.x, clawTarget.y, clawTarget.l2Angle, rightClawExtensionLength)
 
-    if (armType === 'SuperClaw') {
+    const superClawTarget = clawPoint(extendedRightClaw.x, extendedRightClaw.y, extendedLeftClaw.x, extendedLeftClaw.y, drawingParameters.claw.rightArm.scissorLength, drawingParameters.claw.leftArm.scissorLength)
 
+    if (drawingParameters.armType === 'SuperClaw') {
         targetPointX = superClawTarget.x
         targetPointY = superClawTarget.y
     }
     // claw end
 
-    let ox = primeDotCurrentX
-    let oy = primeDotCurrentY
 
-    let sx = normDotCurrentX
-    let sy = normDotCurrentY
+    // simple start
+    const pivotPointAngle = Math.atan2(rightGearPivotY - leftGearPivotY, rightGearPivotX - leftGearPivotX)
 
-    if (anchor == 'Normal') {
-        [ox, oy] = [normDotCurrentX, normDotCurrentY];
-        [sx, sy] = [primeDotCurrentX, primeDotCurrentY];
+    let midpointAxisX = 0
+    let midpointAxisY = 0
+
+    let armOriginX = leftGearPivotX
+    let armOriginY = leftGearPivotY
+
+    let armExtensionFactor = 1
+
+    if (drawingParameters.anchor === 'Left') {
+        armOriginX = leftGearPivotX
+        armOriginY = leftGearPivotY
     }
-    else {
-        [ox, oy] = [primeDotCurrentX, primeDotCurrentY];
-        [sx, sy] = [normDotCurrentX, normDotCurrentY];
-    }
-    const dx = sx - ox
-    const dy = sy - oy
-
-    const distance = Math.sqrt(dx * dx + dy * dy)
-
-    const midX = ox + rodX * dx / distance
-    const midY = oy + rodX * dy / distance
-
-    const midpointAxisX = midX
-    const midpointAxisY = midY
-
-    const rotatedNormPointX = midpointAxisX + (ox - midpointAxisX) * Math.cos(Math.PI / 180 * rodAngle) - (oy - midpointAxisY) * Math.sin(Math.PI / 180 * rodAngle)
-    const rotatedNormPointY = midpointAxisY + (ox - midpointAxisX) * Math.sin(Math.PI / 180 * rodAngle) + (oy - midpointAxisY) * Math.cos(Math.PI / 180 * rodAngle)
-
-    let d2x = rotatedNormPointX - midpointAxisX
-    let d2y = rotatedNormPointY - midpointAxisY
-    const d2Distance = Math.sqrt(d2x * d2x + d2y * d2y)
-
-
-    if (armType === 'Simple') {
-        targetPointX = midpointAxisX + rodLength * d2x / d2Distance
-        targetPointY = midpointAxisY + rodLength * d2y / d2Distance
+    if (drawingParameters.anchor === 'Right') {
+        armOriginX = rightGearPivotX
+        armOriginY = rightGearPivotY
+        armExtensionFactor = -1
     }
 
-    const rodMidpointX = (midpointAxisX + targetPointX) / 2
-    const rodMidpointY = (midpointAxisY + targetPointY) / 2
+    const midpoint = extendLine(armOriginX, armOriginY, pivotPointAngle, drawingParameters.simpleArm.x * armExtensionFactor)
 
+    midpointAxisX = midpoint.x
+    midpointAxisY = midpoint.y
 
-    controls.primeGearMultiplicator = { x: primeDotCurrentX, y: primeDotCurrentY }
-    controls.normGearMultiplicator = { x: normDotCurrentX, y: normDotCurrentY }
-    controls.targetPoint = { x: targetPointX, y: targetPointY }
-    controls.midpointAxis = { x: midpointAxisX, y: midpointAxisY }
-    controls.rodMidpoint = { x: rodMidpointX, y: rodMidpointY }
-    controls.clawIntersection = { x: clawTarget.x, y: clawTarget.y }
-    controls.superClawPrimeExtension = { x: extendedPrimeClaw.x, y: extendedPrimeClaw.y }
-    controls.superClawNormExtension = { x: extendedNormClaw.x, y: extendedNormClaw.y }
+    const targetPoint = extendLine(midpointAxisX, midpointAxisY, drawingParameters.simpleArm.angle, drawingParameters.simpleArm.length)
 
+    if (drawingParameters.armType === 'Simple') {
+        targetPointX = targetPoint.x
+        targetPointY = targetPoint.y
+    }
+
+    if (drawControls && isStopped) {
+        ctx.fillStyle = "green"
+        for (let key of Object.keys(draggables)) {
+
+            if (draggables[key].showWhen && !draggables[key].showWhen(drawingParameters)) {
+                continue;
+            }
+
+            ctx.strokeStyle = getTouchableColor()
+            ctx.beginPath()
+            ctx.arc(draggables[key].x, draggables[key].y, 20, 0, 2 * Math.PI)
+            ctx.stroke()
+            // ctx.fillText(key, draggables[key].x + 10, draggables[key].y + 10)
+        }
+    }
 
     if (!skipDraw && drawControls) {
 
@@ -375,9 +385,9 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
         ctx.lineWidth = 1
         ctx.font = '12px Arial'
 
-        ctx.fillText(primeGear.toString(), primeDotStartX, primeDotStartY)
-        ctx.fillText(normGear.toString(), normDotStartX, normDotStartY)
-        ctx.fillText(turntable.toString(), turntableLocationX, turntableLocationY - turntableRadius - 20)
+        ctx.fillText(drawingParameters.leftGear.teeth.toString(), drawingParameters.leftGear.x, drawingParameters.leftGear.y)
+        ctx.fillText(drawingParameters.rightGear.teeth.toString(), drawingParameters.rightGear.x, drawingParameters.rightGear.y)
+        ctx.fillText(drawingParameters.turntable.teeth.toString(), drawingParameters.turntable.x, drawingParameters.turntable.y - drawingParameters.turntable.radius - 20)
 
         ctx.lineWidth = 0.5
         ctx.strokeStyle = getControlColor()
@@ -385,46 +395,46 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
 
         // Draw prime gear cricle
         ctx.beginPath()
-        ctx.arc(primeDotStartX, primeDotStartY, gearSize60 / 60 * primeGear * primeGearMultiplier, 0, 2 * Math.PI)
+        ctx.arc(drawingParameters.leftGear.x, drawingParameters.leftGear.y, leftGearRadius, 0, 2 * Math.PI)
         ctx.stroke()
 
 
         // draw prime gear anchor point
         ctx.beginPath()
-        ctx.arc(primeDotCurrentX, primeDotCurrentY, 2, 0, 2 * Math.PI)
+        ctx.arc(leftGearPivotX, leftGearPivotY, 2, 0, 2 * Math.PI)
         ctx.fill()
 
 
         // draw normal gear circle
         ctx.beginPath()
-        ctx.arc(normDotStartX, normDotStartY, gearSize60 / 60 * normGear * normGearMultiplier, 0, 2 * Math.PI)
+        ctx.arc(drawingParameters.rightGear.x, drawingParameters.rightGear.y, rightGearRadius, 0, 2 * Math.PI)
         ctx.stroke()
 
 
         // draw normal gear anchor point
         ctx.beginPath()
-        ctx.arc(normDotCurrentX, normDotCurrentY, 2, 0, 2 * Math.PI)
+        ctx.arc(rightGearPivotX, rightGearPivotY, 2, 0, 2 * Math.PI)
         ctx.fill()
 
-        if (anchor === "Normal") {
+        if (drawingParameters.anchor === "Right") {
             ctx.beginPath()
-            ctx.arc(normDotCurrentX, normDotCurrentY, 8, 0, 2 * Math.PI)
+            ctx.arc(rightGearPivotX, rightGearPivotY, 8, 0, 2 * Math.PI)
             ctx.stroke()
         } else {
             ctx.beginPath()
-            ctx.arc(primeDotCurrentX, primeDotCurrentY, 8, 0, 2 * Math.PI)
+            ctx.arc(leftGearPivotX, leftGearPivotY, 8, 0, 2 * Math.PI)
             ctx.stroke()
         }
 
         // draw turntable circle
         ctx.beginPath()
-        ctx.arc(turntableLocationX, turntableLocationY, turntableRadius, 0, 2 * Math.PI)
+        ctx.arc(drawingParameters.turntable.x, drawingParameters.turntable.y, drawingParameters.turntable.radius, 0, 2 * Math.PI)
         ctx.stroke()
 
         // draw turntable center point
         ctx.fillStyle = getControlColor()
         ctx.beginPath()
-        ctx.arc(turntableLocationX, turntableLocationY, 2, 0, 2 * Math.PI)
+        ctx.arc(drawingParameters.turntable.x, drawingParameters.turntable.y, 2, 0, 2 * Math.PI)
         ctx.fill()
 
 
@@ -437,39 +447,39 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
 
         // draw line from prime gear anchor to normal gear anchor
         ctx.beginPath()
-        ctx.moveTo(primeDotCurrentX, primeDotCurrentY)
-        ctx.lineTo(normDotCurrentX, normDotCurrentY)
+        ctx.moveTo(leftGearPivotX, leftGearPivotY)
+        ctx.lineTo(rightGearPivotX, rightGearPivotY)
         ctx.stroke()
-        if (armType === 'SuperClaw') {
+        if (drawingParameters.armType === 'SuperClaw') {
 
             ctx.beginPath()
             ctx.arc(clawTarget.x, clawTarget.y, 2, 0, 2 * Math.PI)
             ctx.fill()
 
             ctx.beginPath()
-            ctx.moveTo(primeDotCurrentX, primeDotCurrentY)
-            ctx.lineTo(extendedPrimeClaw.x, extendedPrimeClaw.y)
+            ctx.moveTo(leftGearPivotX, leftGearPivotY)
+            ctx.lineTo(extendedLeftClaw.x, extendedLeftClaw.y)
             ctx.lineTo(targetPointX, targetPointY)
             ctx.stroke()
 
             ctx.beginPath()
-            ctx.moveTo(normDotCurrentX, normDotCurrentY)
-            ctx.lineTo(extendedNormClaw.x, extendedNormClaw.y)
+            ctx.moveTo(rightGearPivotX, rightGearPivotY)
+            ctx.lineTo(extendedRightClaw.x, extendedRightClaw.y)
             ctx.lineTo(targetPointX, targetPointY)
             ctx.stroke()
 
             ctx.beginPath()
-            ctx.arc(extendedPrimeClaw.x, extendedPrimeClaw.y, 2, 0, 2 * Math.PI)
+            ctx.arc(extendedLeftClaw.x, extendedLeftClaw.y, 2, 0, 2 * Math.PI)
             ctx.fill()
-            
+
             ctx.beginPath()
-            ctx.arc(extendedNormClaw.x, extendedNormClaw.y, 2, 0, 2 * Math.PI)
+            ctx.arc(extendedRightClaw.x, extendedRightClaw.y, 2, 0, 2 * Math.PI)
             ctx.fill()
         }
 
-        else if (armType === 'Claw') {
+        else if (drawingParameters.armType === 'Claw') {
             ctx.beginPath()
-            ctx.moveTo(primeDotCurrentX, primeDotCurrentY)
+            ctx.moveTo(leftGearPivotX, leftGearPivotY)
 
             // // move primeClawTotalLength into primeClawAngle
             ctx.lineTo(
@@ -479,7 +489,7 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
             ctx.stroke()
 
             ctx.beginPath()
-            ctx.moveTo(normDotCurrentX, normDotCurrentY)
+            ctx.moveTo(rightGearPivotX, rightGearPivotY)
             ctx.lineTo(
                 targetPointX,
                 targetPointY
@@ -500,9 +510,6 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
             ctx.lineTo(targetPointX, targetPointY)
             ctx.stroke()
 
-            ctx.beginPath()
-            ctx.arc(rodMidpointX, rodMidpointY, 2, 0, 2 * Math.PI)
-            ctx.fill()
         }
 
     }
@@ -576,41 +583,189 @@ function loadSettings() {
 
 
     const settings = JSON.parse(savedSettings)
-    document.getElementById('primeGear').value = settings.primeGear || 23
-    document.getElementById('normGear').value = settings.normGear || 60
-    document.getElementById('turntable').value = settings.turntable || 60
-    document.getElementById('primeGearMultiplier').value = settings.primeGearMultiplier
-    document.getElementById('normGearMultiplier').value = settings.normGearMultiplier
-    document.getElementById('anchor').value = settings.anchor || 'Prime'
-    document.getElementById('rodLength').value = settings.rodLength || 100
-    document.getElementById('rodX').value = settings.rodX || 500
-    document.getElementById('rodAngle').value = settings.rodAngle || 90
-    document.getElementById('strokeSize').value = settings.stroke || 1
-    document.getElementById('strokeColor').value = settings.color || 'black'
-    document.getElementById('stepSize').value = settings.step || 0.01
-    document.getElementById('speed').value = settings.speed || 1
-    document.getElementById('drawControls').checked = settings.drawControls || false
-    document.getElementById('reverseNormgear').checked = settings.reverseNormgear || false
-    document.getElementById('reversePrimegear').checked = settings.reversePrimegear || false
-    document.getElementById('reverseTurntable').checked = settings.reverseTurntable || false
-    document.getElementById('disableTurntable').checked = settings.disableTurntable || false
-    document.getElementById('themeToggle').innerText = settings.darkMode ? 'Light mode' : 'Dark mode'
 
-    document.getElementById('planetaryGearEnabled').checked = settings.planetaryGearEnabled || false
-    document.getElementById('planetaryInnerGear').value = settings.planetaryInnerGear || 120
-    document.getElementById('planetaryOuterGear').value = settings.planetaryOuterGear || 29
+    drawingParameters = settings.drawingParameters || drawingParameters
+
+    for (let k of Object.keys(draggables)) {
+        if (settings.draggables && settings.draggables[k] && settings.draggables[k].x && settings.draggables[k].y) {
+            draggables[k].x = settings.draggables[k].x
+            draggables[k].y = settings.draggables[k].y
+        }
+    }
+
+    darkMode = settings.darkMode || false
+    stroke = settings.stroke || 1
+    color = settings.color || 'black'
+    step = settings.step || 0.01
+    speed = settings.speed || 1
+    drawControls = settings.drawControls || false
+
+    document.getElementById('strokeSize').value = stroke
+    document.getElementById('strokeColor').value = color
+    document.getElementById('stepSize').value = step
+    document.getElementById('speed').value = speed
+    document.getElementById('drawControls').checked = drawControls
+
+    document.getElementById('leftGear').value = drawingParameters.leftGear?.teeth || 43
+    document.getElementById('rightGear').value = drawingParameters.rightGear?.teeth || 40
+    document.getElementById('turntable').value = drawingParameters.turntable?.teeth || 60
+    document.getElementById('anchor').value = drawingParameters.anchor || 'Left'
+    document.getElementById('rodLength').value = drawingParameters.rodLength || 100
+    document.getElementById('rodX').value = drawingParameters.rodX || 500
+    document.getElementById('leftGearRadius').value = draggables.leftGearPivotPoint.y - draggables.leftGear.y
+    document.getElementById('rightGearRadius').value = draggables.rightGearPivotPoint.y - draggables.rightGear.y
+    document.getElementById('planetaryGearEnabled').checked = drawingParameters.planetaryGearEnable || false
+    document.getElementById('planetaryInnerGear').value = drawingParameters.planetaryGear.innerGear || 12
+    document.getElementById('planetaryOuterGear').value = drawingParameters.planetaryGear.outerGear || 24
+    document.getElementById('arm').value = drawingParameters.armType || "Simple"
 
     applyTheme(settings.darkMode ? 'dark' : 'light')
 }
 
+function lineIntersection(x1, x2, p1, p2) {
+    const dx = x2.x - x1.x;
+    const dy = x2.y - x1.y;
 
+    const ex = p2.x - p1.x;
+    const ey = p2.y - p1.y;
+
+    const denominator = dx * ey - dy * ex;
+
+    // Lines are parallel (or coincident)
+    if (denominator === 0) {
+        return null;
+    }
+
+    const t =
+        ((p1.x - x1.x) * ey - (p1.y - x1.y) * ex) /
+        denominator;
+
+    return {
+        x: x1.x + t * dx,
+        y: x1.y + t * dy
+    };
+}
+
+function updateDrawingSettingsFromDraggables() {
+    drawingParameters.leftGear.x = draggables.leftGear.x
+    drawingParameters.leftGear.y = draggables.leftGear.y
+    drawingParameters.rightGear.x = draggables.rightGear.x
+    drawingParameters.rightGear.y = draggables.rightGear.y
+    drawingParameters.leftGearPivotPoint.x = draggables.leftGearPivotPoint.x
+    drawingParameters.leftGearPivotPoint.y = draggables.leftGearPivotPoint.y
+    drawingParameters.rightGearPivotPoint.x = draggables.rightGearPivotPoint.x
+    drawingParameters.rightGearPivotPoint.y = draggables.rightGearPivotPoint.y
+
+    drawingParameters.planetaryGear.radius = draggables.planetaryGearPivotPoint.y - draggables.rightGearPivotPoint.y
+
+    let rightGearPivotPointX = draggables.rightGearPivotPoint.x
+    let rightGearPivotPointY = draggables.rightGearPivotPoint.y
+
+    if (drawingParameters.planetaryGear.enabled) {
+        rightGearPivotPointX = draggables.planetaryGearPivotPoint.x
+        rightGearPivotPointY = draggables.planetaryGearPivotPoint.y
+
+        draggables.leftGearPivotPoint.x = draggables.leftGear.x
+        draggables.leftGearPivotPoint.y = draggables.leftGear.y
+
+        drawingParameters.leftGearPivotPoint.x = draggables.leftGearPivotPoint.x
+        drawingParameters.leftGearPivotPoint.y = draggables.leftGearPivotPoint.y
+    }
+
+
+    const pivotPointAngle = Math.atan2(rightGearPivotPointY - draggables.leftGearPivotPoint.y, rightGearPivotPointX - draggables.leftGearPivotPoint.x)
+    const leftArmAngle = Math.atan2(draggables.simpleArmTipPoint.y - draggables.simpleArmAnglePoint.y, draggables.simpleArmTipPoint.x - draggables.simpleArmAnglePoint.x)
+    const rightArmAngle = Math.atan2(draggables.simpleArmAnglePoint.y - draggables.simpleArmTipPoint.y, draggables.simpleArmAnglePoint.x - draggables.simpleArmTipPoint.x)
+
+
+    const intersection = lineIntersection(
+        draggables.simpleArmTipPoint,
+        draggables.simpleArmAnglePoint,
+        draggables.leftGearPivotPoint,
+        { x: rightGearPivotPointX, y: rightGearPivotPointY }
+    )
+
+    const leftArmX = calculateDistance(intersection.x, intersection.y, draggables.leftGearPivotPoint.x, draggables.leftGearPivotPoint.y)
+    const rightArmX = calculateDistance(intersection.x, intersection.y, rightGearPivotPointX, rightGearPivotPointY)
+
+    const leftArmLength = calculateDistance(intersection.x, intersection.y, draggables.simpleArmTipPoint.x, draggables.simpleArmTipPoint.y)
+    const rightArmLength = calculateDistance(intersection.x, intersection.y, draggables.simpleArmTipPoint.x, draggables.simpleArmTipPoint.y)
+
+    // const leftPivotPenPointAngle = Math.atan2(draggables.simpleArmTipPoint.y - draggables.leftGearPivotPoint.y, draggables.simpleArmTipPoint.x - draggables.leftGearPivotPoint.x)
+    // const rightPivotPenPointAngle = Math.atan2(draggables.rightGearPivotPoint.y - draggables.simpleArmTipPoint.y, draggables.rightGearPivotPoint.x - draggables.simpleArmTipPoint.x)
+
+    // const leftPivotPenDistance = calculateDistance(draggables.leftGearPivotPoint.x, draggables.leftGearPivotPoint.y, draggables.simpleArmTipPoint.x, draggables.simpleArmTipPoint.y)
+    // const rightPivotPenDistance = calculateDistance(draggables.rightGearPivotPoint.x, draggables.rightGearPivotPoint.y, draggables.simpleArmTipPoint.x, draggables.simpleArmTipPoint.y)
+
+    // const leftArmLength = Math.sin(leftPivotPenPointAngle - pivotPointAngle ) * leftPivotPenDistance
+    // const rightArmLength = Math.sin(rightPivotPenPointAngle - pivotPointAngle - Math.PI ) * rightPivotPenDistance
+
+    // const leftArmX = Math.cos(leftPivotPenPointAngle - pivotPointAngle) * leftPivotPenDistance
+    // const rightArmX = Math.cos(rightPivotPenPointAngle - pivotPointAngle - Math.PI) * rightPivotPenDistance
+
+
+    if (drawingParameters.anchor === 'Left') {
+        drawingParameters.simpleArm.x = leftArmX
+        drawingParameters.simpleArm.length = leftArmLength
+        drawingParameters.simpleArm.angle = leftArmAngle
+    } else {
+        drawingParameters.simpleArm.x = rightArmX
+        drawingParameters.simpleArm.length = rightArmLength
+        drawingParameters.simpleArm.angle = leftArmAngle
+    }
+
+
+
+
+    const leftGearPivotX = draggables.leftGearPivotPoint.x
+    const leftGearPivotY = draggables.leftGearPivotPoint.y
+
+    let rightGearPivotX = draggables.rightGearPivotPoint.x
+    let rightGearPivotY = draggables.rightGearPivotPoint.y
+
+    if (drawingParameters.planetaryGear.enabled) {
+        rightGearPivotX = draggables.planetaryGearPivotPoint.x
+        rightGearPivotY = draggables.planetaryGearPivotPoint.y
+    }
+
+
+    const pivotPointsDistance = calculateDistance(leftGearPivotX, leftGearPivotY, rightGearPivotX, rightGearPivotY)
+
+    const leftClawLengthToIntersection = calculateDistance(leftGearPivotX, leftGearPivotY, draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y)
+    const rightClawLengthToIntersection = calculateDistance(rightGearPivotX, rightGearPivotY, draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y)
+
+    drawingParameters.claw.leftArm.lengthToIntersection = leftClawLengthToIntersection
+    drawingParameters.claw.rightArm.lengthToIntersection = rightClawLengthToIntersection
+
+    const clawTarget = clawPoint(leftGearPivotX, leftGearPivotY, rightGearPivotX, rightGearPivotY, leftClawLengthToIntersection, rightClawLengthToIntersection)
+
+    const leftClawExtensionLength = calculateDistance(draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y, draggables.leftClawEnd.x, draggables.leftClawEnd.y)
+    const rightClawExtensionLength = calculateDistance(draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y, draggables.rightClawEnd.x, draggables.rightClawEnd.y)
+
+    drawingParameters.claw.leftArm.extensionLength = leftClawExtensionLength
+    drawingParameters.claw.rightArm.extensionLength = rightClawExtensionLength
+
+    const leftArmExtension = extendLine(clawTarget.x, clawTarget.y, clawTarget.l1Angle, leftClawExtensionLength)
+    const rightArmExtension = extendLine(clawTarget.x, clawTarget.y, clawTarget.l2Angle, rightClawExtensionLength)
+
+    draggables.leftClawEnd.x = leftArmExtension.x
+    draggables.leftClawEnd.y = leftArmExtension.y
+    draggables.rightClawEnd.x = rightArmExtension.x
+    draggables.rightClawEnd.y = rightArmExtension.y
+
+    drawingParameters.claw.leftArm.scissorLength = calculateDistance(leftArmExtension.x, leftArmExtension.y, draggables.clawEndPoint.x, draggables.clawEndPoint.y)
+    drawingParameters.claw.rightArm.scissorLength = calculateDistance(rightArmExtension.x, rightArmExtension.y, draggables.clawEndPoint.x, draggables.clawEndPoint.y)
+
+}
 
 function updateUIFromParams() {
-    document.getElementById('primeGearMultiplier').value = primeGearMultiplier
-    document.getElementById('normGearMultiplier').value = normGearMultiplier
-    document.getElementById('rodLength').value = rodLength
-    document.getElementById('rodX').value = rodX
-    document.getElementById('rodAngle').value = rodAngle
+    document.getElementById('leftGearRadius').value = draggables.leftGearPivotPoint.y - draggables.leftGear.y
+    document.getElementById('rightGearRadius').value = draggables.rightGearPivotPoint.y - draggables.rightGear.y
+
+    document.getElementById('rodLength').value = drawingParameters.simpleArm.length
+    document.getElementById('rodX').value = drawingParameters.simpleArm.x
+    document.getElementById('rodAngle').value = drawingParameters.simpleArm.angle
+
 }
 
 function storeSettings() {
@@ -623,28 +778,14 @@ function storeSettings() {
     const drawControls = document.getElementById('drawControls').checked
 
     const settings = {
-        primeGear,
-        normGear,
-        turntable,
-        primeGearMultiplier,
-        normGearMultiplier,
-        anchor,
-        disableTurntable,
-        rodLength,
-        rodX,
-        rodAngle,
+        drawingParameters,
+        draggables,
+        darkMode,
         stroke,
         color,
         step,
         speed,
-        drawControls,
-        reverseNormgear,
-        reversePrimegear,
-        reverseTurntable,
-        darkMode,
-        planetaryGearEnabled,
-        planetaryInnerGear,
-        planetaryOuterGear
+        drawControls
     }
 
     localStorage.setItem('settings', JSON.stringify(settings))
@@ -652,35 +793,40 @@ function storeSettings() {
 
 function updateParamsFromUI() {
 
-    primeGear = parseInt(document.getElementById('primeGear').value)
-    normGear = parseInt(document.getElementById('normGear').value)
-    turntable = parseInt(document.getElementById('turntable').value)
+    drawingParameters.leftGear.teeth = parseInt(document.getElementById('leftGear').value)
+    drawingParameters.rightGear.teeth = parseInt(document.getElementById('rightGear').value)
+    drawingParameters.turntable.teeth = parseInt(document.getElementById('turntable').value)
 
-    primeGearMultiplier = parseFloat(document.getElementById('primeGearMultiplier').value)
-    normGearMultiplier = parseFloat(document.getElementById('normGearMultiplier').value)
+    draggables.leftGearPivotPoint.x = draggables.leftGear.x
+    draggables.leftGearPivotPoint.y = draggables.leftGear.y + parseFloat(document.getElementById('leftGearRadius').value)
+    draggables.rightGearPivotPoint.x = draggables.rightGear.x
+    draggables.rightGearPivotPoint.y = draggables.rightGear.y + parseFloat(document.getElementById('rightGearRadius').value)
 
-    reverseNormgear = document.getElementById('reverseNormgear').checked
-    reversePrimegear = document.getElementById('reversePrimegear').checked
-    reverseTurntable = document.getElementById('reverseTurntable').checked
+    drawingParameters.rightGear.reversed = document.getElementById('reverseRightGear').checked
+    drawingParameters.leftGear.reversed = document.getElementById('reverseLeftGear').checked
+    drawingParameters.turntable.reversed = document.getElementById('reverseTurntable').checked
 
-    disableTurntable = document.getElementById('disableTurntable').checked
+    drawingParameters.turntable.disabled = document.getElementById('disableTurntable').checked
 
-    anchor = document.getElementById('anchor').value
+    drawingParameters.anchor = document.getElementById('anchor').value
+    drawingParameters.armType = document.getElementById('arm').value
 
     // primeGearMultiplier = 1
     // normGearMultiplier = 1
 
-    rodLength = parseInt(document.getElementById('rodLength').value)
-    rodX = parseInt(document.getElementById('rodX').value)
-    rodAngle = parseInt(document.getElementById('rodAngle').value)
+    drawingParameters.simpleArm.length = parseInt(document.getElementById('rodLength').value)
+    drawingParameters.simpleArm.x = parseInt(document.getElementById('rodX').value)
 
-    planetaryGearEnabled = document.getElementById('planetaryGearEnabled').checked
-    planetaryInnerGear = parseInt(document.getElementById('planetaryInnerGear').value)
-    planetaryOuterGear = parseInt(document.getElementById('planetaryOuterGear').value)
+    drawingParameters.planetaryGear.enabled = document.getElementById('planetaryGearEnabled').checked
+    drawingParameters.planetaryGear.innerGear = parseInt(document.getElementById('planetaryInnerGear').value)
+    drawingParameters.planetaryGear.outerGear = parseInt(document.getElementById('planetaryOuterGear').value)
 
-    if (planetaryGearEnabled) {
-        primeGearMultiplier = 0
+    if (drawingParameters.planetaryGear.enabled) {
+        drawingParameters.leftGearPivotPoint.x = drawingParameters.leftGear.x
+        drawingParameters.leftGearPivotPoint.y = drawingParameters.leftGear.y
     }
+
+    updateDrawingSettingsFromDraggables()
 
     storeSettings()
 
@@ -691,15 +837,15 @@ function updateParamsFromUI() {
 }
 
 function calculateNeededRounds() {
-    if (planetaryGearEnabled) {
-        neededRounds = Math.min(turntable, normGear) / gcd(turntable, normGear) * planetaryOuterGear
+    if (drawingParameters.planetaryGear.enabled) {
+        neededRounds = Math.min(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth) / gcd(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth) * drawingParameters.planetaryGear.outerGear
     }
     else {
-        neededRounds = Math.min(turntable, normGear) / gcd(turntable, normGear) * primeGear
+        neededRounds = Math.min(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth) / gcd(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth) * drawingParameters.leftGear.teeth
     }
 
-    if (disableTurntable) {
-        neededRounds = normGear / turntable * primeGear
+    if (drawingParameters.turntable.disabled) {
+        neededRounds = drawingParameters.rightGear.teeth / drawingParameters.turntable.teeth * drawingParameters.leftGear.teeth
     }
 
 }
@@ -755,7 +901,7 @@ function immediate() {
 
     stepSize = parseFloat(document.getElementById('stepSize').value)
 
-    for (let i = 0; i < neededRounds; i += stepSize) {
+    for (let i = 0; i <= neededRounds; i += stepSize) {
         calculatePoint(i, true)
     }
 
@@ -799,6 +945,7 @@ function stop() {
         window.cancelAnimationFrame(animationHandle)
         animationHandle = null
         isStopped = true
+        calculatePoint(currentRounds, false, true)
     }
     drawInfo()
 }
@@ -912,7 +1059,7 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas = document.getElementById('c');
     ctx = canvas.getContext('2d');
 
-    const primeGearInput = document.getElementById('primeGear');
+    const primeGearInput = document.getElementById('leftGear');
     primeGearInput.value = nearestPrime(Number(primeGearInput.value));
 
     const planetaryOuterGearInput = document.getElementById('planetaryOuterGear');
@@ -920,11 +1067,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadSettings();
 
-    ['primeGear', 'normGear', 'turntable', 'primeGearMultiplier', 'normGearMultiplier', 'rodLength', 'rodX', 'rodAngle', 'stepSize', 'planetaryInnerGear', 'planetaryOuterGear'].forEach(t => bindSlider(t, true));
+    ['leftGear', 'rightGear', 'turntable', 'leftGearRadius', 'rightGearRadius', 'rodLength', 'rodX', 'rodAngle', 'stepSize', 'planetaryInnerGear', 'planetaryOuterGear'].forEach(t => bindSlider(t, true));
     ['speed', 'strokeSize'].forEach(t => bindSlider(t, false));
 
-    document.getElementById('primeGear').value = nearestPrime(Number(document.getElementById('primeGear').value));
-    document.querySelector('[data-slider="primeGear"]').value = document.getElementById('primeGear').value;
+    document.getElementById('leftGear').value = nearestPrime(Number(document.getElementById('leftGear').value));
+    document.querySelector('[data-slider="leftGear"]').value = document.getElementById('leftGear').value;
 
     document.getElementById('planetaryOuterGear').value = nearestPrime(Number(document.getElementById('planetaryOuterGear').value));
     document.querySelector('[data-slider="planetaryOuterGear"]').value = document.getElementById('planetaryOuterGear').value;
