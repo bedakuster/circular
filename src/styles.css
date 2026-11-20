@@ -1,0 +1,145 @@
+:root {
+    --bg: #f4f4f4;
+    --panel: #ffffff;
+    --ink: #1d1d1d;
+    --muted: #666;
+    --border: #d7d7d7;
+    --accent: #2c7be5;
+    --canvas-bg: #ffffff;
+}
+
+.dark-mode {
+    --bg: #0b1020;
+    --panel: #141d2b;
+    --ink: #edf3ff;
+    --muted: #b7c5dd;
+    --border: #2b3a4f;
+    --accent: #7aa8ff;
+    --canvas-bg: #0d1117;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0px;
+    font-family: Arial, sans-serif;
+
+}
+
+#root>div {
+    background: var(--bg);
+    color: var(--ink);
+}
+
+.panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 0 auto 12px;
+    width: 100%;
+}
+
+.control {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.control span {
+    font-weight: 600;
+    white-space: nowrap;
+    width: 95px;
+}
+
+.value {
+    width: 70px;
+    text-align: right;
+    font-size: 11px;
+    color: var(--ink);
+    font-weight: 700;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 6px;
+    height: 26px;
+}
+
+input[type='range'] {
+    width: 110px;
+    accent-color: var(--accent);
+}
+
+input[type='number'],
+input[type='text'],
+select {
+    width: 80px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0 6px;
+    color: var(--ink);
+    background: var(--bg);
+}
+
+button {
+    border: 0;
+    background: var(--accent);
+    color: white;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.content {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    height: 100vh;
+    padding: 12px;
+}
+
+.sidebar {
+    /* width: auto; */
+    display: flex;
+    flex-direction: column;
+    width: 410px;
+}
+
+.maincontent {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+
+.maincontent .panel {
+    width: 100%;
+}
+
+.canvas-container {
+    width: 100%;
+    height: 100%;
+    background: var(--canvas-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+
+@media (max-width: 768px) {
+    .content {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+    }
+}
