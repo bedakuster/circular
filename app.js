@@ -21,9 +21,13 @@ let rodLength = 400
 let rodX = 0.5
 let rodAngle = 90
 
+let clawPrimeLength = 200
+let clawNormLength = 200
+
 let reverseNormgear = false
 let reversePrimegear = false
 let reverseTurntable = false
+let disableTurntable = false
 
 let planetaryGearEnabled = true
 let planetaryInnerGear = 120
@@ -32,9 +36,23 @@ let planetaryOuterGear = 29
 let gearSize60 = 100
 let turntable = 60
 
+let primeClawIntersectionLength = 500
+let normClawIntersectionLength = 500
+
+let primeSuperClawExtension = 100
+let normSuperClawExtension = 100
+
+let primeSuperClawScissorLength = 100
+let normSuperClawScissorLength = 100
+
 let anchor = 'Prime'
 
+// Arm type can be 'Simple' or 'Claw' or 'SuperClaw'
+let armType = 'SuperClaw'
+
 const gcd = (a, b) => (b === 0 ? Math.abs(a) : gcd(b, a % b));
+const keepEveryNthPoint = 2
+let realPointCount = 0
 
 let neededRounds = 0
 
@@ -109,6 +127,77 @@ function drawPattern() {
 
 }
 
+function getEasedStepSize(baseStepSize, rounds, speed) {
+    const remainingRounds = neededRounds - rounds
+    const safeSpeed = Math.max(speed, 1)
+
+    if (remainingRounds <= 0) {
+        return baseStepSize
+    }
+
+    const minFactor = 0.15
+    const easeInWindow = 1
+    const easeOutWindow = 1
+    let easeInFactor = 1
+    let easeOutFactor = 1
+
+    if (rounds < easeInWindow) {
+        const normalizedProgress = Math.max(0, rounds) / easeInWindow
+        easeInFactor = minFactor + (1 - minFactor) * normalizedProgress * normalizedProgress
+    }
+
+    if (remainingRounds < easeOutWindow) {
+        const normalizedRemaining = Math.max(0, remainingRounds) / easeOutWindow
+        easeOutFactor = minFactor + (1 - minFactor) * normalizedRemaining * normalizedRemaining
+    }
+
+    const easedFactor = Math.min(easeInFactor, easeOutFactor)
+    const easedStepSize = baseStepSize * easedFactor
+    const maxStepToFinish = remainingRounds / safeSpeed
+
+    return Math.min(easedStepSize, maxStepToFinish)
+}
+
+function triangleHeight(a, b, c) {
+    const s = (a + b + c) / 2;
+
+    const area = Math.sqrt(
+        s * (s - a) * (s - b) * (s - c)
+    );
+
+    return 2 * area / c;
+}
+
+function clawPoint(primeDotCurrentX, primeDotCurrentY, normDotCurrentX, normDotCurrentY, primeLength, normLength) {
+    const pointDistance = Math.sqrt((primeDotCurrentX - normDotCurrentX) ** 2 + (primeDotCurrentY - normDotCurrentY) ** 2)
+
+    const primeClawIntersectionLength = primeLength
+    const normClawIntersectionLength = normLength
+
+    const height = triangleHeight(primeClawIntersectionLength, normClawIntersectionLength, pointDistance)
+    const primeClawAngle = Math.asin(height / primeClawIntersectionLength)
+    const normClawAngle = Math.asin(height / normClawIntersectionLength)
+
+    const lineAngle = Math.atan2(normDotCurrentY - primeDotCurrentY, normDotCurrentX - primeDotCurrentX)
+    const l1Angle = lineAngle + primeClawAngle
+    const l2Angle = lineAngle + Math.PI - normClawAngle
+
+    return {
+        x: primeDotCurrentX + primeClawIntersectionLength * Math.cos(l1Angle),
+        y: primeDotCurrentY + primeClawIntersectionLength * Math.sin(l1Angle),
+
+        l1Angle: l1Angle,
+        l2Angle: l2Angle
+    }
+}
+
+function extendLine(x, y, angle, length) {
+    return {
+        x: x + length * Math.cos(angle),
+        y: y + length * Math.sin(angle)
+    }
+}
+
 function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipVertexAddition = false) {
 
     drawInfo()
@@ -118,11 +207,12 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
 
     const primeY = Math.cos(primeRounds * 2 * Math.PI)
     const primeX = Math.sin(primeRounds * 2 * Math.PI)
+
     const normY = Math.cos(normRounds * 2 * Math.PI)
     const normX = Math.sin(normRounds * 2 * Math.PI)
 
-    const turntableY = Math.cos(rounds * 2 * Math.PI * (reverseTurntable ? -1 : 1))
-    const turntableX = Math.sin(rounds * 2 * Math.PI * (reverseTurntable ? -1 : 1))
+    const turntableY = Math.cos(rounds * 2 * Math.PI * (disableTurntable ? 0 : (reverseTurntable ? -1 : 1)))
+    const turntableX = Math.sin(rounds * 2 * Math.PI * (disableTurntable ? 0 : (reverseTurntable ? -1 : 1)))
 
 
     if (!skipDraw) {
@@ -131,13 +221,22 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
         ctx.fillRect(-10000, -10000, canvas.width * 100, canvas.height * 100)
     }
 
-    for (let i = 0; i < points.length; i++) {
-        const p = points[i]
-        const rotatedPoint = rotatePointAroundPivot(p, turntableLocationX, turntableLocationY, (rounds - currentRounds) * (reverseTurntable ? -1 : 1))
+    // delete older intermediate points
+    points = points.filter((p) => p.keep || p.i > realPointCount - 100)
 
-        p.x = rotatedPoint.x
-        p.y = rotatedPoint.y
+    if (!disableTurntable) {
+
+        for (let i = 0; i < points.length; i++) {
+            const p = points[i]
+            const rotatedPoint = rotatePointAroundPivot(p, turntableLocationX, turntableLocationY, (rounds - currentRounds) * (reverseTurntable ? -1 : 1))
+
+            p.x = rotatedPoint.x
+            p.y = rotatedPoint.y
+
+
+        }
     }
+
 
     if (!skipDraw)
         drawPattern()
@@ -191,6 +290,32 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
 
     }
 
+    let targetPointX = 0, targetPointY = 0
+
+    // claw stuff
+    const pointDistance = Math.sqrt((primeDotCurrentX - normDotCurrentX) ** 2 + (primeDotCurrentY - normDotCurrentY) ** 2)
+
+    const primeClawTotalLength = primeClawIntersectionLength + primeSuperClawExtension
+    const normClawTotalLength = normClawIntersectionLength + normSuperClawExtension
+
+    const clawTarget = clawPoint(primeDotCurrentX, primeDotCurrentY, normDotCurrentX, normDotCurrentY, primeClawIntersectionLength, normClawIntersectionLength)
+
+    if (armType === 'Claw') {
+        targetPointX = clawTarget.x
+        targetPointY = clawTarget.y
+    }
+
+    const extendedPrimeClaw = extendLine(primeDotCurrentX, primeDotCurrentY, clawTarget.l1Angle, primeClawTotalLength)
+    const extendedNormClaw = extendLine(normDotCurrentX, normDotCurrentY, clawTarget.l2Angle, normClawTotalLength)
+
+    const superClawTarget = clawPoint(extendedNormClaw.x, extendedNormClaw.y, extendedPrimeClaw.x, extendedPrimeClaw.y, normSuperClawScissorLength, primeSuperClawScissorLength)
+
+    if (armType === 'SuperClaw') {
+
+        targetPointX = superClawTarget.x
+        targetPointY = superClawTarget.y
+    }
+    // claw end
 
     let ox = primeDotCurrentX
     let oy = primeDotCurrentY
@@ -224,17 +349,25 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     let d2y = rotatedNormPointY - midpointAxisY
     const d2Distance = Math.sqrt(d2x * d2x + d2y * d2y)
 
-    const targetPointX = midpointAxisX + rodLength * d2x / d2Distance
-    const targetPointY = midpointAxisY + rodLength * d2y / d2Distance
+
+    if (armType === 'Simple') {
+        targetPointX = midpointAxisX + rodLength * d2x / d2Distance
+        targetPointY = midpointAxisY + rodLength * d2y / d2Distance
+    }
 
     const rodMidpointX = (midpointAxisX + targetPointX) / 2
     const rodMidpointY = (midpointAxisY + targetPointY) / 2
+
 
     controls.primeGearMultiplicator = { x: primeDotCurrentX, y: primeDotCurrentY }
     controls.normGearMultiplicator = { x: normDotCurrentX, y: normDotCurrentY }
     controls.targetPoint = { x: targetPointX, y: targetPointY }
     controls.midpointAxis = { x: midpointAxisX, y: midpointAxisY }
     controls.rodMidpoint = { x: rodMidpointX, y: rodMidpointY }
+    controls.clawIntersection = { x: clawTarget.x, y: clawTarget.y }
+    controls.superClawPrimeExtension = { x: extendedPrimeClaw.x, y: extendedPrimeClaw.y }
+    controls.superClawNormExtension = { x: extendedNormClaw.x, y: extendedNormClaw.y }
+
 
     if (!skipDraw && drawControls) {
 
@@ -307,26 +440,77 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
         ctx.moveTo(primeDotCurrentX, primeDotCurrentY)
         ctx.lineTo(normDotCurrentX, normDotCurrentY)
         ctx.stroke()
+        if (armType === 'SuperClaw') {
+
+            ctx.beginPath()
+            ctx.arc(clawTarget.x, clawTarget.y, 2, 0, 2 * Math.PI)
+            ctx.fill()
+
+            ctx.beginPath()
+            ctx.moveTo(primeDotCurrentX, primeDotCurrentY)
+            ctx.lineTo(extendedPrimeClaw.x, extendedPrimeClaw.y)
+            ctx.lineTo(targetPointX, targetPointY)
+            ctx.stroke()
+
+            ctx.beginPath()
+            ctx.moveTo(normDotCurrentX, normDotCurrentY)
+            ctx.lineTo(extendedNormClaw.x, extendedNormClaw.y)
+            ctx.lineTo(targetPointX, targetPointY)
+            ctx.stroke()
+
+            ctx.beginPath()
+            ctx.arc(extendedPrimeClaw.x, extendedPrimeClaw.y, 2, 0, 2 * Math.PI)
+            ctx.fill()
+            
+            ctx.beginPath()
+            ctx.arc(extendedNormClaw.x, extendedNormClaw.y, 2, 0, 2 * Math.PI)
+            ctx.fill()
+        }
+
+        else if (armType === 'Claw') {
+            ctx.beginPath()
+            ctx.moveTo(primeDotCurrentX, primeDotCurrentY)
+
+            // // move primeClawTotalLength into primeClawAngle
+            ctx.lineTo(
+                targetPointX,
+                targetPointY
+            )
+            ctx.stroke()
+
+            ctx.beginPath()
+            ctx.moveTo(normDotCurrentX, normDotCurrentY)
+            ctx.lineTo(
+                targetPointX,
+                targetPointY
+            )
+            ctx.stroke()
 
 
-        ctx.beginPath()
-        ctx.arc(midpointAxisX, midpointAxisY, 2, 0, 2 * Math.PI)
-        ctx.fill()
 
-        // draw line from midpoint axis to target point
-        ctx.beginPath()
-        ctx.moveTo(midpointAxisX, midpointAxisY)
-        ctx.lineTo(targetPointX, targetPointY)
-        ctx.stroke()
+        } else {
 
-        ctx.beginPath()
-        ctx.arc(rodMidpointX, rodMidpointY, 2, 0, 2 * Math.PI)
-        ctx.fill()
+            ctx.beginPath()
+            ctx.arc(midpointAxisX, midpointAxisY, 2, 0, 2 * Math.PI)
+            ctx.fill()
+
+            // draw line from midpoint axis to target point
+            ctx.beginPath()
+            ctx.moveTo(midpointAxisX, midpointAxisY)
+            ctx.lineTo(targetPointX, targetPointY)
+            ctx.stroke()
+
+            ctx.beginPath()
+            ctx.arc(rodMidpointX, rodMidpointY, 2, 0, 2 * Math.PI)
+            ctx.fill()
+        }
+
     }
 
     if ((!skipDraw && rounds < neededRounds) || drawControls) {
         // draw target point
-        ctx.fillStyle = getControlColor()
+        if (drawControls) ctx.fillStyle = getControlColor()
+        else ctx.fillStyle = getStrokeColor()
         ctx.beginPath()
         ctx.arc(targetPointX, targetPointY, 2, 0, 2 * Math.PI)
         ctx.fill()
@@ -335,7 +519,12 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     if (!drawExactlyOnce) {
 
         if (!skipVertexAddition) {
-            points.push({ r: rounds, x: targetPointX, y: targetPointY })
+            points.push({ keep: true, i: realPointCount, x: targetPointX, y: targetPointY })
+            realPointCount++;
+
+            if (realPointCount % keepEveryNthPoint !== 0) {
+                points[points.length - 1].keep = false
+            }
         }
 
         currentRounds = rounds
@@ -352,8 +541,9 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     if (drawExactlyOnce)
         return
 
-    stepSize = parseFloat(document.getElementById('stepSize').value)
-    speed = parseFloat(document.getElementById('speed').value)
+    const baseStepSize = parseFloat(document.getElementById('stepSize').value)
+    const speed = parseFloat(document.getElementById('speed').value)
+    const stepSize = getEasedStepSize(baseStepSize, currentRounds, speed)
 
 
     for (let i = 0; i < speed - 1; i++) {
@@ -371,6 +561,7 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     // setTimeout(() => {
     //     animationHandle = window.requestAnimationFrame(() => calculatePoint(currentRounds + stepSize))
     // }, 1000)
+
 
     animationHandle = window.requestAnimationFrame(() => calculatePoint(currentRounds + stepSize))
 
@@ -402,6 +593,7 @@ function loadSettings() {
     document.getElementById('reverseNormgear').checked = settings.reverseNormgear || false
     document.getElementById('reversePrimegear').checked = settings.reversePrimegear || false
     document.getElementById('reverseTurntable').checked = settings.reverseTurntable || false
+    document.getElementById('disableTurntable').checked = settings.disableTurntable || false
     document.getElementById('themeToggle').innerText = settings.darkMode ? 'Light mode' : 'Dark mode'
 
     document.getElementById('planetaryGearEnabled').checked = settings.planetaryGearEnabled || false
@@ -412,7 +604,6 @@ function loadSettings() {
 }
 
 
-let updateParamsBlockage = false
 
 function updateUIFromParams() {
     document.getElementById('primeGearMultiplier').value = primeGearMultiplier
@@ -422,37 +613,7 @@ function updateUIFromParams() {
     document.getElementById('rodAngle').value = rodAngle
 }
 
-function updateParamsFromUI() {
-    if (updateParamsBlockage) return
-
-    primeGear = parseInt(document.getElementById('primeGear').value)
-    normGear = parseInt(document.getElementById('normGear').value)
-    turntable = parseInt(document.getElementById('turntable').value)
-
-    primeGearMultiplier = parseFloat(document.getElementById('primeGearMultiplier').value)
-    normGearMultiplier = parseFloat(document.getElementById('normGearMultiplier').value)
-
-    reverseNormgear = document.getElementById('reverseNormgear').checked
-    reversePrimegear = document.getElementById('reversePrimegear').checked
-    reverseTurntable = document.getElementById('reverseTurntable').checked
-
-    anchor = document.getElementById('anchor').value
-
-    // primeGearMultiplier = 1
-    // normGearMultiplier = 1
-
-    rodLength = parseInt(document.getElementById('rodLength').value)
-    rodX = parseInt(document.getElementById('rodX').value)
-    rodAngle = parseInt(document.getElementById('rodAngle').value)
-
-    planetaryGearEnabled = document.getElementById('planetaryGearEnabled').checked
-    planetaryInnerGear = parseInt(document.getElementById('planetaryInnerGear').value)
-    planetaryOuterGear = parseInt(document.getElementById('planetaryOuterGear').value)
-
-    if (planetaryGearEnabled) {
-        primeGearMultiplier = 0
-    }
-
+function storeSettings() {
     const darkMode = isDarkMode()
     const stroke = document.getElementById('strokeSize').value
     const color = document.getElementById('strokeColor').value
@@ -468,6 +629,7 @@ function updateParamsFromUI() {
         primeGearMultiplier,
         normGearMultiplier,
         anchor,
+        disableTurntable,
         rodLength,
         rodX,
         rodAngle,
@@ -486,18 +648,60 @@ function updateParamsFromUI() {
     }
 
     localStorage.setItem('settings', JSON.stringify(settings))
+}
 
+function updateParamsFromUI() {
 
+    primeGear = parseInt(document.getElementById('primeGear').value)
+    normGear = parseInt(document.getElementById('normGear').value)
+    turntable = parseInt(document.getElementById('turntable').value)
+
+    primeGearMultiplier = parseFloat(document.getElementById('primeGearMultiplier').value)
+    normGearMultiplier = parseFloat(document.getElementById('normGearMultiplier').value)
+
+    reverseNormgear = document.getElementById('reverseNormgear').checked
+    reversePrimegear = document.getElementById('reversePrimegear').checked
+    reverseTurntable = document.getElementById('reverseTurntable').checked
+
+    disableTurntable = document.getElementById('disableTurntable').checked
+
+    anchor = document.getElementById('anchor').value
+
+    // primeGearMultiplier = 1
+    // normGearMultiplier = 1
+
+    rodLength = parseInt(document.getElementById('rodLength').value)
+    rodX = parseInt(document.getElementById('rodX').value)
+    rodAngle = parseInt(document.getElementById('rodAngle').value)
+
+    planetaryGearEnabled = document.getElementById('planetaryGearEnabled').checked
+    planetaryInnerGear = parseInt(document.getElementById('planetaryInnerGear').value)
+    planetaryOuterGear = parseInt(document.getElementById('planetaryOuterGear').value)
+
+    if (planetaryGearEnabled) {
+        primeGearMultiplier = 0
+    }
+
+    storeSettings()
+
+    if (!animationHandle) {
+        calculatePoint(currentRounds, false, true)
+    }
 
 }
 
 function calculateNeededRounds() {
     if (planetaryGearEnabled) {
-        neededRounds = Math.ceil(Math.min(turntable, normGear) / gcd(turntable, normGear)) * planetaryOuterGear
+        neededRounds = Math.min(turntable, normGear) / gcd(turntable, normGear) * planetaryOuterGear
     }
     else {
-        neededRounds = Math.ceil(Math.min(turntable, normGear) / gcd(turntable, normGear)) * primeGear
+        neededRounds = Math.min(turntable, normGear) / gcd(turntable, normGear) * primeGear
     }
+
+    if (disableTurntable) {
+        neededRounds = normGear / turntable * primeGear
+    }
+
 }
 
 function reset() {
@@ -506,8 +710,30 @@ function reset() {
     calculateNeededRounds()
     currentRounds = 0
     points = []
+    realPointCount = 0
     drawInfo()
     calculatePoint(0, false, true)
+}
+
+function last10Percents() {
+    stop()
+    // updateParams()
+    calculateNeededRounds()
+    if (!validateNeededRounds()) return;
+    drawInfo()
+    currentRounds = 0
+    points = []
+    realPointCount = 0
+
+    stepSize = parseFloat(document.getElementById('stepSize').value)
+
+    for (let i = 0; i < neededRounds * 0.9; i += stepSize) {
+        calculatePoint(i, true)
+    }
+
+    calculatePoint(neededRounds * 0.9, false, true)
+    isStopped = true
+    start()
 }
 
 function validateNeededRounds() {
@@ -524,6 +750,7 @@ function immediate() {
     if (!validateNeededRounds()) return;
     drawInfo()
     currentRounds = 0
+    realPointCount = 0
     points = []
 
     stepSize = parseFloat(document.getElementById('stepSize').value)
@@ -546,6 +773,7 @@ function restart() {
 
     currentRounds = 0
     points = []
+    realPointCount = 0
     animationHandle = window.requestAnimationFrame(() => calculatePoint(currentRounds))
 }
 
