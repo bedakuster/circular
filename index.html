@@ -219,7 +219,7 @@
                 <label class="control checkbox">
                     <span>Enable Planetary Gear</span>
 
-                    <input onchange="updateParamsFromUI()" id="planetaryGearEnabled" type="checkbox" checked></label>
+                    <input onchange="updateParamsFromUI()" id="planetaryGearEnabled" type="checkbox"></label>
 
                 <label class="control big">
 
@@ -243,9 +243,9 @@
                     <select onchange="(() => {
                         updateParamsFromUI(); 
                     })()" id="arm">
-                        <option>Simple</option>
+                        <option selected>Simple</option>
                         <option>Claw</option>
-                        <option selected>SuperClaw</option>
+                        <option >SuperClaw</option>
                     </select></label>
 
 
@@ -304,6 +304,7 @@
 
             <div class="panel">
                 <button id="themeToggle" type="button">Dark mode</button>
+                <button onclick="factoryReset()">Factory Reset</button>
             </div>
 
         </div>

@@ -1,8 +1,7 @@
 let canvas = null
 let ctx = null
 
-
-let draggables = {
+let defaultDraggables = {
     leftGear: { x: 100, y: 100, moveAlso: ['leftGearPivotPoint'] },
     rightGear: { x: 900, y: 100, moveAlso: ['rightGearPivotPoint', 'planetaryGearPivotPoint'] },
     leftGearPivotPoint: { x: 100, y: 200, allowX: false },
@@ -16,7 +15,7 @@ let draggables = {
     clawEndPoint: { x: 500, y: 600, showWhen: (settings) => settings.armType === 'SuperClaw' }
 }
 
-let drawingParameters = {
+let defaultDrawingParameters = {
     leftGear: {
         x: 100, y: 100, teeth: 31, reversed: false, draggable: true
     },
@@ -46,6 +45,11 @@ let drawingParameters = {
     }
 }
 
+let draggables = JSON.parse(JSON.stringify(defaultDraggables))
+for (let k of Object.keys(defaultDraggables)) {
+    draggables[k].showWhen = defaultDraggables[k].showWhen
+}
+let drawingParameters = JSON.parse(JSON.stringify(defaultDrawingParameters))
 
 const gcd = (a, b) => (b === 0 ? Math.abs(a) : gcd(b, a % b));
 const keepEveryNthPoint = 2
@@ -356,7 +360,7 @@ function calculatePoint(rounds, skipDraw = false, drawExactlyOnce = false, skipV
     midpointAxisX = midpoint.x
     midpointAxisY = midpoint.y
 
-    const targetPoint = extendLine(midpointAxisX, midpointAxisY, drawingParameters.simpleArm.angle, drawingParameters.simpleArm.length)
+    const targetPoint = extendLine(midpointAxisX, midpointAxisY, drawingParameters.simpleArm.angle + pivotPointAngle, drawingParameters.simpleArm.length)
 
     if (drawingParameters.armType === 'Simple') {
         targetPointX = targetPoint.x
@@ -950,6 +954,19 @@ function stop() {
     drawInfo()
 }
 
+function factoryReset() {
+    localStorage.removeItem('settings')
+    draggables = JSON.parse(JSON.stringify(defaultDraggables))
+    for (let k of Object.keys(defaultDraggables)) {
+        draggables[k].showWhen = defaultDraggables[k].showWhen
+    }
+    drawingParameters = JSON.parse(JSON.stringify(defaultDrawingParameters))
+    updateDrawingSettingsFromDraggables()
+    storeSettings()
+    loadSettings()
+    updateUIFromParams()
+    reset()
+}
 
 
 function isPrime(value) {
