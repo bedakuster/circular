@@ -43,6 +43,7 @@ export interface DrawingParameters {
     speed: number;
     leftGearPivotPoint: Point & { draggable: boolean };
     rightGearPivotPoint: Point & { draggable: boolean };
+    rightGearEllipsePoint: Point & { draggable: boolean };
     simpleArm: { x: number; length: number; angle: number };
     claw: {
         leftArm: ClawArmSettings;
@@ -64,6 +65,7 @@ export type DraggablesMap = {
     rightGear: DraggablePoint;
     leftGearPivotPoint: DraggablePoint;
     rightGearPivotPoint: DraggablePoint;
+    rightGearEllipsePoint: DraggablePoint;
     simpleArmAnglePoint: DraggablePoint;
     simpleArmTipPoint: DraggablePoint;
     planetaryGearPivotPoint: DraggablePoint;
@@ -111,9 +113,10 @@ export interface SavedCyclographState {
 
 export const createDefaultDraggables = (): DraggablesMap => ({
     leftGear: { id: 'leftGear', x: 100, y: 100, moveAlso: ['leftGearPivotPoint'] },
-    rightGear: { id: 'rightGear', x: 900, y: 100, moveAlso: ['rightGearPivotPoint', 'planetaryGearPivotPoint'] },
+    rightGear: { id: 'rightGear', x: 900, y: 100, moveAlso: ['rightGearPivotPoint', 'rightGearEllipsePoint', 'planetaryGearPivotPoint'] },
     leftGearPivotPoint: { id: 'leftGearPivotPoint', x: 100, y: 200, allowX: false },
     rightGearPivotPoint: { id: 'rightGearPivotPoint', x: 900, y: 200, allowX: false, moveAlso: ['planetaryGearPivotPoint'] },
+    rightGearEllipsePoint: { id: 'rightGearEllipsePoint', x: 1000, y: 100, allowY: false },
     simpleArmAnglePoint: { id: 'simpleArmAnglePoint', x: 500, y: 500, showWhen: settings => settings.armType === 'Simple' },
     simpleArmTipPoint: { id: 'simpleArmTipPoint', x: 500, y: 600, moveAlso: ['simpleArmAnglePoint'], showWhen: settings => settings.armType === 'Simple' },
     planetaryGearPivotPoint: { id: 'planetaryGearPivotPoint', x: 900, y: 300, allowX: false, showWhen: settings => settings.planetaryGear.enabled },
@@ -134,6 +137,7 @@ export const createDefaultDrawingParameters = (): DrawingParameters => ({
     speed: 1,
     leftGearPivotPoint: { draggable: true, x: 100, y: 200 },
     rightGearPivotPoint: { draggable: true, x: 900, y: 200 },
+    rightGearEllipsePoint: { draggable: true, x: 1000, y: 100 },
     simpleArm: { x: 400, length: 400, angle: Math.PI / 2 },
     claw: {
         leftArm: { lengthToIntersection: 0, extensionLength: 0, scissorLength: 0 },

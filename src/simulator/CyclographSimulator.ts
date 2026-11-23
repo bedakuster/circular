@@ -205,7 +205,8 @@ export class CyclographSimulator {
         const leftGearRounds = (drawingParameters.turntable.teeth / drawingParameters.leftGear.teeth) * rounds * (drawingParameters.leftGear.reversed ? -1 : 1);
         const rightGearRounds = (drawingParameters.turntable.teeth / drawingParameters.rightGear.teeth) * rounds * (drawingParameters.rightGear.reversed ? -1 : 1);
         const leftGearRadius = calculateDistance(drawingParameters.leftGear.x, drawingParameters.leftGear.y, drawingParameters.leftGearPivotPoint.x, drawingParameters.leftGearPivotPoint.y);
-        const rightGearRadius = calculateDistance(drawingParameters.rightGear.x, drawingParameters.rightGear.y, drawingParameters.rightGearPivotPoint.x, drawingParameters.rightGearPivotPoint.y);
+        const rightGearYRadius = Math.abs(draggables.rightGearPivotPoint.y - drawingParameters.rightGear.y);
+        const rightGearXRadius = Math.abs(draggables.rightGearEllipsePoint.x - drawingParameters.rightGear.x);
         const leftGearYFactor = Math.cos(leftGearRounds * 2 * Math.PI);
         const leftGearXFactor = Math.sin(leftGearRounds * 2 * Math.PI);
         const rightGearYFactor = Math.cos(rightGearRounds * 2 * Math.PI);
@@ -241,13 +242,19 @@ export class CyclographSimulator {
         drawingParameters.leftGearPivotPoint.x = leftGearPivotX;
         drawingParameters.leftGearPivotPoint.y = leftGearPivotY;
 
-        let rightGearPivotX = drawingParameters.rightGear.x + rightGearXFactor * rightGearRadius;
-        let rightGearPivotY = drawingParameters.rightGear.y + rightGearYFactor * rightGearRadius;
+        let rightGearPivotX = drawingParameters.rightGear.x + rightGearXFactor * rightGearXRadius;
+        let rightGearPivotY = drawingParameters.rightGear.y + rightGearYFactor * rightGearYRadius;
         drawingParameters.rightGearPivotPoint.x = rightGearPivotX;
         drawingParameters.rightGearPivotPoint.y = rightGearPivotY;
+        drawingParameters.rightGearEllipsePoint.x = drawingParameters.rightGear.x + rightGearXRadius;
+        drawingParameters.rightGearEllipsePoint.y = drawingParameters.rightGear.y;
 
-        const turntableCurrentX = drawingParameters.turntable.x + turntableXFactor * drawingParameters.turntable.radius;
-        const turntableCurrentY = drawingParameters.turntable.y + turntableYFactor * drawingParameters.turntable.radius;
+        const turntableCenterX = drawingParameters.turntable.x;
+        const turntableCenterY = drawingParameters.turntable.y;
+
+        const turntableCurrentX = turntableCenterX + turntableXFactor * drawingParameters.turntable.radius;
+        const turntableCurrentY = turntableCenterY + turntableYFactor * drawingParameters.turntable.radius;
+
         const drawControls = this.store.ui.drawControls;
 
         if (drawingParameters.planetaryGear.enabled) {
@@ -347,7 +354,7 @@ export class CyclographSimulator {
             this.context.fill();
 
             this.context.beginPath();
-            this.context.arc(drawingParameters.rightGear.x, drawingParameters.rightGear.y, rightGearRadius, 0, 2 * Math.PI);
+            this.context.ellipse(drawingParameters.rightGear.x, drawingParameters.rightGear.y, rightGearXRadius, rightGearYRadius, 0, 0, 2 * Math.PI);
             this.context.stroke();
             this.context.beginPath();
             this.context.arc(rightGearPivotX, rightGearPivotY, 2, 0, 2 * Math.PI);
@@ -358,11 +365,11 @@ export class CyclographSimulator {
             this.context.stroke();
 
             this.context.beginPath();
-            this.context.arc(drawingParameters.turntable.x, drawingParameters.turntable.y, drawingParameters.turntable.radius, 0, 2 * Math.PI);
+            this.context.arc(turntableCenterX, turntableCenterY, drawingParameters.turntable.radius, 0, 2 * Math.PI);
             this.context.stroke();
 
             this.context.beginPath();
-            this.context.arc(drawingParameters.turntable.x, drawingParameters.turntable.y, 2, 0, 2 * Math.PI);
+            this.context.arc(turntableCenterX, turntableCenterY, 2, 0, 2 * Math.PI);
             this.context.fill();
             this.context.beginPath();
             this.context.arc(turntableCurrentX, turntableCurrentY, 2, 0, 2 * Math.PI);
@@ -490,6 +497,8 @@ export class CyclographSimulator {
         drawingParameters.leftGearPivotPoint.y = draggables.leftGearPivotPoint.y;
         drawingParameters.rightGearPivotPoint.x = draggables.rightGearPivotPoint.x;
         drawingParameters.rightGearPivotPoint.y = draggables.rightGearPivotPoint.y;
+        drawingParameters.rightGearEllipsePoint.x = draggables.rightGearEllipsePoint.x;
+        drawingParameters.rightGearEllipsePoint.y = draggables.rightGearEllipsePoint.y;
         drawingParameters.planetaryGear.radius = draggables.planetaryGearPivotPoint.y - draggables.rightGearPivotPoint.y;
 
         let rightGearPivotPointX = draggables.rightGearPivotPoint.x;
