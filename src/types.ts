@@ -98,6 +98,17 @@ export interface UiState {
     drawControls: boolean;
 }
 
+export interface SavedCyclographState {
+    id: string;
+    name: string;
+    savedAt: string;
+    drawingParameters: DrawingParameters;
+    draggables: DraggablesMap;
+    ui: UiState;
+    darkMode: boolean;
+    thumbnail: string;
+}
+
 export const createDefaultDraggables = (): DraggablesMap => ({
     leftGear: { id: 'leftGear', x: 100, y: 100, moveAlso: ['leftGearPivotPoint'] },
     rightGear: { id: 'rightGear', x: 900, y: 100, moveAlso: ['rightGearPivotPoint', 'planetaryGearPivotPoint'] },

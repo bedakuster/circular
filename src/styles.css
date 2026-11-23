@@ -115,6 +115,121 @@ button {
     width: 410px;
 }
 
+.state-manager-panel {
+    border-style: dashed;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.state-manager-panel.drop-active {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+
+.state-status {
+    width: 100%;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.modal-backdrop {
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.state-modal {
+    width: min(520px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel);
+    color: var(--ink);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.state-modal h2 {
+    margin-top: 0;
+}
+
+.modal-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modal-name input {
+    width: 100%;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.state-load-modal {
+    width: min(760px, calc(100vw - 32px));
+}
+
+.state-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.state-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.state-card img,
+.state-thumbnail-placeholder {
+    width: 100%;
+    height: 120px;
+    object-fit: scale-down;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--canvas-bg);
+}
+
+.state-thumbnail-placeholder {
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+}
+
+.state-card strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.state-card > span {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.state-card-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.delete-button {
+    background: #a43d3d;
+}
+
 .maincontent {
     display: flex;
     flex-direction: column;

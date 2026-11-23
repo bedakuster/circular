@@ -5,6 +5,7 @@ import {
     createDefaultUiState,
     DraggablesMap,
     DrawingParameters,
+    SavedCyclographState,
     UiState,
 } from '../types';
 
@@ -19,6 +20,9 @@ export interface SimulatorApi {
     last10Percents(): void;
     factoryReset(): void;
     resize(): void;
+    isRenderedComplete(): boolean;
+    ensurePatternRendered(): void;
+    getCanvasDataUrl(): string;
 }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -33,9 +37,142 @@ export class AppStore {
     neededRounds = 0;
     vertices = 0;
     simulator: SimulatorApi | null = null;
+    savedStates: SavedCyclographState[] = [];
+    savedStatesKey = 'cyclograph.savedStates.v1';
 
     constructor() {
         makeAutoObservable(this, {}, { autoBind: true });
+        this.savedStates = this.readSavedStates();
+    }
+
+    private readSavedStates(): SavedCyclographState[] {
+        const raw = localStorage.getItem(this.savedStatesKey);
+        if (!raw) return [];
+        try {
+            const parsed = JSON.parse(raw) as unknown;
+            return Array.isArray(parsed) ? parsed as SavedCyclographState[] : [];
+        } catch {
+            return [];
+        }
+    }
+
+    private persistSavedStates(): void {
+        localStorage.setItem(this.savedStatesKey, JSON.stringify(this.savedStates));
+    }
+
+    refreshSavedStates(): void {
+        this.savedStates = this.readSavedStates();
+    }
+
+    saveCurrentState(name: string): SavedCyclographState {
+        const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const state: SavedCyclographState = {
+            id,
+            name: name.trim() || `Cyclograph ${new Date().toLocaleString()}`,
+            savedAt: new Date().toISOString(),
+            drawingParameters: clone(this.drawingParameters),
+            draggables: this.cloneDraggablesForPersistence(),
+            ui: clone(this.ui),
+            darkMode: this.darkMode,
+            thumbnail: this.simulator?.getCanvasDataUrl() || '',
+        };
+        this.savedStates = [state, ...this.savedStates];
+        this.persistSavedStates();
+        return state;
+    }
+
+    private cloneDraggablesForPersistence(): DraggablesMap {
+        const plain = JSON.parse(JSON.stringify(this.draggables)) as Record<string, Omit<DraggablesMap[string], 'showWhen'>>;
+        const result = createDefaultDraggables();
+        for (const key of Object.keys(result)) {
+            if (plain[key]) {
+                result[key] = {
+                    ...result[key],
+                    id: plain[key].id,
+                    x: plain[key].x,
+                    y: plain[key].y,
+                    allowX: plain[key].allowX,
+                    allowY: plain[key].allowY,
+                    moveAlso: plain[key].moveAlso,
+                };
+            }
+        }
+        return result;
+    }
+
+    loadSavedState(id: string): void {
+        const state = this.savedStates.find(item => item.id === id);
+        if (!state) return;
+        this.applySavedState(state);
+    }
+
+    applySavedState(state: SavedCyclographState): void {
+        if (!state.drawingParameters || !state.draggables || !state.ui) return;
+
+        const mergedDrawing = createDefaultDrawingParameters();
+        Object.assign(mergedDrawing, state.drawingParameters);
+        mergedDrawing.leftGear = { ...mergedDrawing.leftGear, ...state.drawingParameters.leftGear };
+        mergedDrawing.rightGear = { ...mergedDrawing.rightGear, ...state.drawingParameters.rightGear };
+        mergedDrawing.turntable = { ...mergedDrawing.turntable, ...state.drawingParameters.turntable };
+        mergedDrawing.planetaryGear = { ...mergedDrawing.planetaryGear, ...state.drawingParameters.planetaryGear };
+        mergedDrawing.leftGearPivotPoint = { ...mergedDrawing.leftGearPivotPoint, ...state.drawingParameters.leftGearPivotPoint };
+        mergedDrawing.rightGearPivotPoint = { ...mergedDrawing.rightGearPivotPoint, ...state.drawingParameters.rightGearPivotPoint };
+        mergedDrawing.simpleArm = { ...mergedDrawing.simpleArm, ...state.drawingParameters.simpleArm };
+        mergedDrawing.claw = {
+            leftArm: { ...createDefaultDrawingParameters().claw.leftArm, ...state.drawingParameters.claw?.leftArm },
+            rightArm: { ...createDefaultDrawingParameters().claw.rightArm, ...state.drawingParameters.claw?.rightArm },
+        };
+        this.drawingParameters = mergedDrawing;
+
+        const mergedDraggables = createDefaultDraggables();
+        for (const key of Object.keys(mergedDraggables)) {
+            const saved = state.draggables[key];
+            if (saved) {
+                mergedDraggables[key] = { ...mergedDraggables[key], ...saved };
+            }
+        }
+        this.draggables = mergedDraggables;
+        this.ui = { ...createDefaultUiState(), ...state.ui };
+        this.darkMode = state.darkMode;
+        this.storeSettings();
+        this.simulator?.updateParamsFromStore(false);
+        this.simulator?.reset();
+    }
+
+    importSavedStates(items: unknown): number {
+        const candidates: unknown[] = Array.isArray(items)
+            ? items
+            : typeof items === 'object' && items !== null && 'states' in items
+                ? (items as { states: unknown }).states as unknown[] 
+                : [items];
+
+        let imported = 0;
+        for (const candidate of candidates) {
+            if (!candidate || typeof candidate !== 'object') continue;
+            const value = candidate as Partial<SavedCyclographState>;
+            if (!value.drawingParameters || !value.draggables || !value.ui) continue;
+            const state: SavedCyclographState = {
+                id: value.id || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${imported}`),
+                name: value.name?.trim() || `Imported Cyclograph ${imported + 1}`,
+                savedAt: value.savedAt || new Date().toISOString(),
+                drawingParameters: value.drawingParameters,
+                draggables: value.draggables,
+                ui: value.ui,
+                darkMode: Boolean(value.darkMode),
+                thumbnail: value.thumbnail || '',
+            };
+            this.savedStates = [state, ...this.savedStates];
+            imported++;
+        }
+        if (imported > 0) this.persistSavedStates();
+        return imported;
+    }
+
+    deleteSavedState(id: string): void {
+        this.savedStates = this.savedStates.filter(state => state.id !== id);
+        this.persistSavedStates();
     }
 
     attachSimulator(simulator: SimulatorApi): void {

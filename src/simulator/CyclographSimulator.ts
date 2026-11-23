@@ -109,6 +109,21 @@ export class CyclographSimulator {
         this.calculatePoint(0, false, true);
     }
 
+    isRenderedComplete(): boolean {
+        return this.currentRounds >= this.neededRounds;
+    }
+
+    getCanvasDataUrl(): string {
+        return this.canvas.toDataURL('image/png');
+    }
+
+    ensurePatternRendered(): void {
+        this.calculateNeededRounds();
+        if (!this.isRenderedComplete()) {
+            this.immediate();
+        }
+    }
+
     private isDarkMode(): boolean {
         return this.store.darkMode;
     }
@@ -503,24 +518,26 @@ export class CyclographSimulator {
 
         const leftClawLengthToIntersection = calculateDistance(leftGearPivotX, leftGearPivotY, draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y);
         const rightClawLengthToIntersection = calculateDistance(rightGearPivotX, rightGearPivotY, draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y);
-        drawingParameters.claw.leftArm.lengthToIntersection = leftClawLengthToIntersection;
-        drawingParameters.claw.rightArm.lengthToIntersection = rightClawLengthToIntersection;
+        drawingParameters.claw.leftArm.lengthToIntersection = Math.max(2000, leftClawLengthToIntersection);
+        drawingParameters.claw.rightArm.lengthToIntersection = Math.max(2000, rightClawLengthToIntersection);
 
         const clawTarget = clawPoint(leftGearPivotX, leftGearPivotY, rightGearPivotX, rightGearPivotY, leftClawLengthToIntersection, rightClawLengthToIntersection);
         const leftClawExtensionLength = calculateDistance(draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y, draggables.leftClawEnd.x, draggables.leftClawEnd.y);
         const rightClawExtensionLength = calculateDistance(draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y, draggables.rightClawEnd.x, draggables.rightClawEnd.y);
-        drawingParameters.claw.leftArm.extensionLength = leftClawExtensionLength;
-        drawingParameters.claw.rightArm.extensionLength = rightClawExtensionLength;
+        drawingParameters.claw.leftArm.extensionLength = Math.max(2000, leftClawExtensionLength);
+        drawingParameters.claw.rightArm.extensionLength = Math.max(2000, rightClawExtensionLength);
 
         const leftArmExtension = extendLine(clawTarget.x, clawTarget.y, clawTarget.l1Angle, leftClawExtensionLength);
         const rightArmExtension = extendLine(clawTarget.x, clawTarget.y, clawTarget.l2Angle, rightClawExtensionLength);
+
         draggables.leftClawEnd.x = leftArmExtension.x;
         draggables.leftClawEnd.y = leftArmExtension.y;
+        
         draggables.rightClawEnd.x = rightArmExtension.x;
         draggables.rightClawEnd.y = rightArmExtension.y;
 
-        drawingParameters.claw.leftArm.scissorLength = calculateDistance(leftArmExtension.x, leftArmExtension.y, draggables.clawEndPoint.x, draggables.clawEndPoint.y);
-        drawingParameters.claw.rightArm.scissorLength = calculateDistance(rightArmExtension.x, rightArmExtension.y, draggables.clawEndPoint.x, draggables.clawEndPoint.y);
+        drawingParameters.claw.leftArm.scissorLength = Math.max(2000, calculateDistance(leftArmExtension.x, leftArmExtension.y, draggables.clawEndPoint.x, draggables.clawEndPoint.y));
+        drawingParameters.claw.rightArm.scissorLength = Math.max(2000, calculateDistance(rightArmExtension.x, rightArmExtension.y, draggables.clawEndPoint.x, draggables.clawEndPoint.y));
 
         this.store.syncUiFromCurrentState();
     }
@@ -569,6 +586,7 @@ export class CyclographSimulator {
     }
 
     immediate(): void {
+        const start = performance.now();
         this.stop();
         this.calculateNeededRounds();
         if (!this.validateNeededRounds()) return;
@@ -581,6 +599,8 @@ export class CyclographSimulator {
             this.calculatePoint(i, true);
         }
         this.calculatePoint(this.neededRounds, false, true);
+        const end = performance.now();
+        console.log(`Immediate calculation took ${end - start} ms`);
     }
 
     restart(): void {
@@ -694,7 +714,7 @@ export class CyclographSimulator {
             const canvasPoint = this.getMouseCanvasPoint(event);
             this.dragStartPosition = this.getTransformedPoint(canvasPoint.x, canvasPoint.y);
 
-            if (this.isStopped) {
+            if (this.isStopped && this.store.ui.drawControls) {
 
                 let minDistance = Number.POSITIVE_INFINITY;
                 let minDistanceControl: DraggablePoint | null = null;

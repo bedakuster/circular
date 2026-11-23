@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { ReactElement } from 'react';
 import { appStore } from './store/AppStore';
 import { CyclographSimulator } from './simulator/CyclographSimulator';
+import { StateManager } from './components/StateManager';
 
 type SliderProps = {
     label: string;
@@ -59,6 +60,7 @@ export const App = observer((): ReactElement => {
         <div className={controlsClass}>
             <div className="content">
                 <div className="sidebar">
+                    <StateManager />
                     <div className="panel">
                         <SliderControl label="Left" value={appStore.ui.leftGear} min={1} max={80} onChange={value => setNumeric('leftGear', value)} />
                         <SliderControl label="Right" value={appStore.ui.rightGear} min={1} max={120} onChange={value => setNumeric('rightGear', value)} />
