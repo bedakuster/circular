@@ -8,6 +8,7 @@ import {
     SavedCyclographState,
     UiState,
 } from '../types';
+import { extendLine } from '../simulator/CyclographSimulator';
 
 export interface SimulatorApi {
     initialize(): void;
@@ -36,6 +37,7 @@ export class AppStore {
     currentRounds = 0;
     neededRounds = 0;
     vertices = 0;
+    warning = '';
     simulator: SimulatorApi | null = null;
     savedStates: SavedCyclographState[] = [];
     savedStatesKey = 'cyclograph.savedStates.v1';
@@ -145,7 +147,7 @@ export class AppStore {
         const candidates: unknown[] = Array.isArray(items)
             ? items
             : typeof items === 'object' && items !== null && 'states' in items
-                ? (items as { states: unknown }).states as unknown[] 
+                ? (items as { states: unknown }).states as unknown[]
                 : [items];
 
         let imported = 0;
@@ -179,11 +181,12 @@ export class AppStore {
         this.simulator = simulator;
     }
 
-    updateProgress(progressText: string, currentRounds: number, neededRounds: number, vertices: number): void {
+    updateProgress(progressText: string, currentRounds: number, neededRounds: number, vertices: number, warning: string): void {
         this.progressText = progressText;
         this.currentRounds = currentRounds;
         this.neededRounds = neededRounds;
         this.vertices = vertices;
+        this.warning = warning;
     }
 
     setUiValue<K extends keyof UiState>(key: K, value: UiState[K]): void {
@@ -233,8 +236,34 @@ export class AppStore {
 
         this.draggables.leftGearPivotPoint.x = this.draggables.leftGear.x;
         this.draggables.leftGearPivotPoint.y = this.draggables.leftGear.y + this.ui.leftGearRadius;
+        this.drawingParameters.leftGearPivotPoint.x = this.draggables.leftGearPivotPoint.x;
+        this.drawingParameters.leftGearPivotPoint.y = this.draggables.leftGearPivotPoint.y;
+
         this.draggables.rightGearPivotPoint.x = this.draggables.rightGear.x;
         this.draggables.rightGearPivotPoint.y = this.draggables.rightGear.y + this.ui.rightGearRadius;
+        this.drawingParameters.rightGearPivotPoint.x = this.draggables.rightGearPivotPoint.x;
+        this.drawingParameters.rightGearPivotPoint.y = this.draggables.rightGearPivotPoint.y;
+
+        const pivotPointAngle = Math.atan2(this.drawingParameters.rightGearPivotPoint.y - this.drawingParameters.leftGearPivotPoint.y, this.drawingParameters.rightGearPivotPoint.x - this.drawingParameters.leftGearPivotPoint.x);
+
+        if (this.drawingParameters.anchor === 'Left') {
+            const anglePoint = extendLine(this.drawingParameters.leftGearPivotPoint.x, this.drawingParameters.leftGearPivotPoint.y, pivotPointAngle, this.ui.rodX);
+            const penPoint = extendLine(anglePoint.x, anglePoint.y, pivotPointAngle + this.drawingParameters.simpleArm.angle, this.ui.rodLength);
+            this.draggables.simpleArmAnglePoint.x = anglePoint.x;
+            this.draggables.simpleArmAnglePoint.y = anglePoint.y;
+
+            this.draggables.simpleArmTipPoint.x = penPoint.x
+            this.draggables.simpleArmTipPoint.y = penPoint.y
+
+        } else if (this.drawingParameters.anchor === 'Right') {
+            const anglePoint = extendLine(this.drawingParameters.rightGearPivotPoint.x, this.drawingParameters.rightGearPivotPoint.y, pivotPointAngle, - this.ui.rodX);
+            const penPoint = extendLine(anglePoint.x, anglePoint.y, pivotPointAngle + this.drawingParameters.simpleArm.angle,this.ui.rodLength);
+            this.draggables.simpleArmAnglePoint.x = anglePoint.x;
+            this.draggables.simpleArmAnglePoint.y = anglePoint.y;
+
+            this.draggables.simpleArmTipPoint.x = penPoint.x
+            this.draggables.simpleArmTipPoint.y = penPoint.y
+        }
 
         if (this.drawingParameters.planetaryGear.enabled) {
             this.drawingParameters.leftGearPivotPoint.x = this.drawingParameters.leftGear.x;

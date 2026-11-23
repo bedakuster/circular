@@ -258,3 +258,7 @@ button {
         width: 100%;
     }
 }
+
+.warning {
+    color: #a43d3d;
+}

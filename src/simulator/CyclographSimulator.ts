@@ -15,7 +15,7 @@ const triangleHeight = (a: number, b: number, c: number): number => {
     return (2 * area) / c;
 };
 
-const extendLine = (x: number, y: number, angle: number, length: number): Point => ({
+export const extendLine = (x: number, y: number, angle: number, length: number): Point => ({
     x: x + length * Math.cos(angle),
     y: y + length * Math.sin(angle),
 });
@@ -80,6 +80,7 @@ export class CyclographSimulator {
     private points: DrawPoint[] = [];
     private realPointCount = 0;
     private pixelRatio = window.devicePixelRatio || 1;
+    private immediateFastPath = false;
 
     private isDragging = false;
     private dragStartPosition: Point = { x: 0, y: 0 };
@@ -150,7 +151,8 @@ export class CyclographSimulator {
     private drawInfo(): void {
         const progress = this.neededRounds === 0 ? 0 : (this.currentRounds / this.neededRounds) * 100;
         const message = `Progress: ${progress.toFixed(2)}% | Rounds: ${this.currentRounds.toFixed(3)} / ${this.neededRounds} | Vertices: ${this.points.length} | GCD: ${gcd(this.store.drawingParameters.turntable.teeth, this.store.drawingParameters.rightGear.teeth)} | Factor: ${this.store.drawingParameters.turntable.teeth / gcd(this.store.drawingParameters.turntable.teeth, this.store.drawingParameters.rightGear.teeth)}`;
-        this.store.updateProgress(message, this.currentRounds, this.neededRounds, this.points.length);
+        const warning = this.neededRounds > 230 ? 'Needed rounds exceeds 230. Make sure Turntable and Right have a great common divisor > 2.' : '';
+        this.store.updateProgress(message, this.currentRounds, this.neededRounds, this.points.length, warning);
     }
 
     private drawPattern(): void {
@@ -195,7 +197,10 @@ export class CyclographSimulator {
     private calculatePoint(rounds: number, skipDraw = false, drawExactlyOnce = false, skipVertexAddition = false): boolean | void {
         const drawingParameters = this.store.drawingParameters;
         const draggables = this.store.draggables;
-        this.drawInfo();
+        const immediateFastPathActive = this.immediateFastPath && skipDraw && !drawExactlyOnce && !skipVertexAddition;
+        if (!immediateFastPathActive) {
+            this.drawInfo();
+        }
 
         const leftGearRounds = (drawingParameters.turntable.teeth / drawingParameters.leftGear.teeth) * rounds * (drawingParameters.leftGear.reversed ? -1 : 1);
         const rightGearRounds = (drawingParameters.turntable.teeth / drawingParameters.rightGear.teeth) * rounds * (drawingParameters.rightGear.reversed ? -1 : 1);
@@ -213,18 +218,19 @@ export class CyclographSimulator {
             this.context.fillRect(-10000, -10000, this.canvas.width * 100, this.canvas.height * 100);
         }
 
-        this.points = this.points.filter(p => p.keep || p.i > this.realPointCount - 100);
-
-        if (!drawingParameters.turntable.disabled) {
-            for (const p of this.points) {
-                const rotatedPoint = rotatePointAroundPivot(
-                    p,
-                    drawingParameters.turntable.x,
-                    drawingParameters.turntable.y,
-                    (rounds - this.currentRounds) * (drawingParameters.turntable.reversed ? -1 : 1),
-                );
-                p.x = rotatedPoint.x;
-                p.y = rotatedPoint.y;
+        if (!immediateFastPathActive) {
+            this.points = this.points.filter(p => p.keep || p.i > this.realPointCount - 100);
+            if (!drawingParameters.turntable.disabled) {
+                for (const p of this.points) {
+                    const rotatedPoint = rotatePointAroundPivot(
+                        p,
+                        drawingParameters.turntable.x,
+                        drawingParameters.turntable.y,
+                        (rounds - this.currentRounds) * (drawingParameters.turntable.reversed ? -1 : 1),
+                    );
+                    p.x = rotatedPoint.x;
+                    p.y = rotatedPoint.y;
+                }
             }
         }
 
@@ -412,6 +418,17 @@ export class CyclographSimulator {
 
         if (!drawExactlyOnce) {
             if (!skipVertexAddition) {
+                if (immediateFastPathActive && !drawingParameters.turntable.disabled) {
+                    const finalTurntableRotation = (this.neededRounds - rounds) * (drawingParameters.turntable.reversed ? -1 : 1);
+                    const projectedTargetPoint = rotatePointAroundPivot(
+                        { x: targetPointX, y: targetPointY },
+                        drawingParameters.turntable.x,
+                        drawingParameters.turntable.y,
+                        finalTurntableRotation,
+                    );
+                    targetPointX = projectedTargetPoint.x;
+                    targetPointY = projectedTargetPoint.y;
+                }
                 this.points.push({ keep: true, i: this.realPointCount, x: targetPointX, y: targetPointY });
                 this.realPointCount++;
                 if (this.realPointCount % keepEveryNthPoint !== 0) {
@@ -448,12 +465,12 @@ export class CyclographSimulator {
             this.neededRounds =
                 (Math.min(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth) /
                     gcd(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth)) *
-                drawingParameters.planetaryGear.outerGear;
+                drawingParameters.planetaryGear.outerGear / gcd(drawingParameters.turntable.teeth, drawingParameters.planetaryGear.outerGear);
         } else {
             this.neededRounds =
                 (Math.min(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth) /
                     gcd(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth)) *
-                drawingParameters.leftGear.teeth;
+                drawingParameters.leftGear.teeth / gcd(drawingParameters.turntable.teeth, drawingParameters.leftGear.teeth);
         }
         if (drawingParameters.turntable.disabled) {
             this.neededRounds = (drawingParameters.rightGear.teeth / drawingParameters.turntable.teeth) * drawingParameters.leftGear.teeth;
@@ -518,42 +535,53 @@ export class CyclographSimulator {
 
         const leftClawLengthToIntersection = calculateDistance(leftGearPivotX, leftGearPivotY, draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y);
         const rightClawLengthToIntersection = calculateDistance(rightGearPivotX, rightGearPivotY, draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y);
-        drawingParameters.claw.leftArm.lengthToIntersection = Math.max(2000, leftClawLengthToIntersection);
-        drawingParameters.claw.rightArm.lengthToIntersection = Math.max(2000, rightClawLengthToIntersection);
+        drawingParameters.claw.leftArm.lengthToIntersection = Math.min(2000, leftClawLengthToIntersection);
+        drawingParameters.claw.rightArm.lengthToIntersection = Math.min(2000, rightClawLengthToIntersection);
 
         const clawTarget = clawPoint(leftGearPivotX, leftGearPivotY, rightGearPivotX, rightGearPivotY, leftClawLengthToIntersection, rightClawLengthToIntersection);
         const leftClawExtensionLength = calculateDistance(draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y, draggables.leftClawEnd.x, draggables.leftClawEnd.y);
         const rightClawExtensionLength = calculateDistance(draggables.clawIntersectionPoint.x, draggables.clawIntersectionPoint.y, draggables.rightClawEnd.x, draggables.rightClawEnd.y);
-        drawingParameters.claw.leftArm.extensionLength = Math.max(2000, leftClawExtensionLength);
-        drawingParameters.claw.rightArm.extensionLength = Math.max(2000, rightClawExtensionLength);
+        drawingParameters.claw.leftArm.extensionLength = Math.min(2000, leftClawExtensionLength);
+        drawingParameters.claw.rightArm.extensionLength = Math.min(2000, rightClawExtensionLength);
 
         const leftArmExtension = extendLine(clawTarget.x, clawTarget.y, clawTarget.l1Angle, leftClawExtensionLength);
         const rightArmExtension = extendLine(clawTarget.x, clawTarget.y, clawTarget.l2Angle, rightClawExtensionLength);
 
         draggables.leftClawEnd.x = leftArmExtension.x;
         draggables.leftClawEnd.y = leftArmExtension.y;
-        
+
         draggables.rightClawEnd.x = rightArmExtension.x;
         draggables.rightClawEnd.y = rightArmExtension.y;
 
-        drawingParameters.claw.leftArm.scissorLength = Math.max(2000, calculateDistance(leftArmExtension.x, leftArmExtension.y, draggables.clawEndPoint.x, draggables.clawEndPoint.y));
-        drawingParameters.claw.rightArm.scissorLength = Math.max(2000, calculateDistance(rightArmExtension.x, rightArmExtension.y, draggables.clawEndPoint.x, draggables.clawEndPoint.y));
+        drawingParameters.claw.leftArm.scissorLength = Math.min(2000, calculateDistance(leftArmExtension.x, leftArmExtension.y, draggables.clawEndPoint.x, draggables.clawEndPoint.y));
+        drawingParameters.claw.rightArm.scissorLength = Math.min(2000, calculateDistance(rightArmExtension.x, rightArmExtension.y, draggables.clawEndPoint.x, draggables.clawEndPoint.y));
 
         this.store.syncUiFromCurrentState();
+        this.immediate(true, 0.015)
     }
+
 
     updateParamsFromStore(redraw = true): void {
         this.store.applyUiToDrawingParameters();
-        this.updateDrawingSettingsFromDraggables();
+        // this.updateDrawingSettingsFromDraggables();
         this.store.storeSettings();
-        if (redraw && !this.animationHandle) {
-            this.calculatePoint(this.currentRounds, false, true);
+        // if (redraw && !this.animationHandle) {
+        //     this.calculatePoint(this.currentRounds, false, true);
+        // }
+        this.calculateNeededRounds();
+        this.drawInfo()
+        if (redraw && this.isStopped) {
+            this.immediate(true, 0.015);
         }
     }
 
-    private validateNeededRounds(): boolean {
+    private validateNeededRounds(askToEnforce = false): boolean {
         if (this.neededRounds >= 230) {
-            return window.confirm('Needed rounds exceeds 230, this can take very long...');
+            if (askToEnforce) {
+                return window.confirm('Needed rounds exceeds 230, this can take very long...');
+            } else {
+                return false;
+            }
         }
         return true;
     }
@@ -585,20 +613,28 @@ export class CyclographSimulator {
         this.start();
     }
 
-    immediate(): void {
+    immediate(isPreview = false, overrideStepSize?: number): void {
         const start = performance.now();
         this.stop();
         this.calculateNeededRounds();
-        if (!this.validateNeededRounds()) return;
+        if (!this.validateNeededRounds(!isPreview)) return;
         this.drawInfo();
         this.currentRounds = 0;
         this.realPointCount = 0;
         this.points = [];
-        const stepSize = this.store.ui.stepSize;
-        for (let i = 0; i <= this.neededRounds; i += stepSize) {
-            this.calculatePoint(i, true);
+        const stepSize = overrideStepSize ?? this.store.ui.stepSize;
+        this.immediateFastPath = true;
+        try {
+            for (let i = 0; i <= this.neededRounds; i += stepSize) {
+                this.calculatePoint(i, true);
+            }
+            this.points = this.points.filter(p => p.keep || p.i > this.realPointCount - 100);
+            this.currentRounds = this.neededRounds;
+            this.drawInfo();
+            this.calculatePoint(this.neededRounds, false, true);
+        } finally {
+            this.immediateFastPath = false;
         }
-        this.calculatePoint(this.neededRounds, false, true);
         const end = performance.now();
         console.log(`Immediate calculation took ${end - start} ms`);
     }
@@ -768,6 +804,8 @@ export class CyclographSimulator {
         const onMouseUp = (): void => {
             this.isDragging = false;
             this.clickedControl = null;
+            if (this.isStopped)
+                this.immediate(true)
         };
 
         const onWheel = (event: WheelEvent): void => {

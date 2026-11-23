@@ -29,7 +29,7 @@ export const App = observer((): ReactElement => {
     useEffect(() => {
         if (!canvasRef.current) return;
         if (appStore.simulator) return;
-        
+
         const simulator = new CyclographSimulator(appStore, canvasRef.current);
         simulator.initialize();
         simulatorRef.current = simulator;
@@ -43,10 +43,9 @@ export const App = observer((): ReactElement => {
         };
     }, []);
 
-    const setNumeric = (key: keyof typeof appStore.ui, value: number, resetOnChange = true): void => {
+    const setNumeric = (key: keyof typeof appStore.ui, value: number, redraw = true): void => {
         appStore.setUiValue(key, value as never);
-        simulatorRef.current?.updateParamsFromStore();
-        if (resetOnChange) simulatorRef.current?.reset();
+        simulatorRef.current?.updateParamsFromStore(redraw);
     };
 
     const setBoolean = (key: keyof typeof appStore.ui, value: boolean): void => {
@@ -97,7 +96,7 @@ export const App = observer((): ReactElement => {
                         </label>
                         <SliderControl label="Rod Len" value={appStore.ui.rodLength} min={-1000} max={1000} onChange={value => setNumeric('rodLength', value)} />
                         <SliderControl label="Rod X" value={appStore.ui.rodX} min={0} max={1000} onChange={value => setNumeric('rodX', value)} />
-                        <SliderControl label="Rod Angle" value={appStore.ui.rodAngle} min={-1000} max={1000} step={0.001} onChange={value => setNumeric('rodAngle', value)} />
+                        <SliderControl label="Rod Angle" value={appStore.ui.rodAngle * 180 / Math.PI} min={-360} max={360} step={0.1} onChange={value => setNumeric('rodAngle', value / 180 * Math.PI)} />
                     </div>
 
                     <div className="panel">
@@ -138,7 +137,13 @@ export const App = observer((): ReactElement => {
                 </div>
 
                 <div className="maincontent">
-                    <div id="info-panel" className="panel">{appStore.progressText}</div>
+                    <div id="info-panel" className="panel">
+                        {appStore.progressText}
+
+                    </div>
+                    {appStore.warning &&
+                        <div className="panel warning">{appStore.warning}</div>
+                    }
                     <div className="canvas-container">
                         <canvas height={900} width={1000} id="c" ref={canvasRef} />
                     </div>
