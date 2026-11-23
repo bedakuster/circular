@@ -81,6 +81,7 @@ export class CyclographSimulator {
     private realPointCount = 0;
     private pixelRatio = window.devicePixelRatio || 1;
     private immediateFastPath = false;
+    private immediateFastPathTargetRounds = 0;
 
     private isDragging = false;
     private dragStartPosition: Point = { x: 0, y: 0 };
@@ -144,8 +145,16 @@ export class CyclographSimulator {
         return this.isDarkMode() ? '#3586f8' : '#003c91';
     }
 
+    private getControlThickness(): number {
+        return 1;
+    }
+
     private getTouchableColor(): string {
         return this.isDarkMode() ? '#6bbcff' : '#001747';
+    }
+
+    private getTouchableThickness(): number {
+        return 2;
     }
 
     private drawInfo(): void {
@@ -204,7 +213,8 @@ export class CyclographSimulator {
 
         const leftGearRounds = (drawingParameters.turntable.teeth / drawingParameters.leftGear.teeth) * rounds * (drawingParameters.leftGear.reversed ? -1 : 1);
         const rightGearRounds = (drawingParameters.turntable.teeth / drawingParameters.rightGear.teeth) * rounds * (drawingParameters.rightGear.reversed ? -1 : 1);
-        const leftGearRadius = calculateDistance(drawingParameters.leftGear.x, drawingParameters.leftGear.y, drawingParameters.leftGearPivotPoint.x, drawingParameters.leftGearPivotPoint.y);
+        const leftGearYRadius = Math.abs(draggables.leftGearPivotPoint.y - drawingParameters.leftGear.y);
+        const leftGearXRadius = Math.abs(draggables.leftGearEllipsePoint.x - drawingParameters.leftGear.x);
         const rightGearYRadius = Math.abs(draggables.rightGearPivotPoint.y - drawingParameters.rightGear.y);
         const rightGearXRadius = Math.abs(draggables.rightGearEllipsePoint.x - drawingParameters.rightGear.x);
         const leftGearYFactor = Math.cos(leftGearRounds * 2 * Math.PI);
@@ -237,10 +247,12 @@ export class CyclographSimulator {
 
         if (!skipDraw) this.drawPattern();
 
-        const leftGearPivotX = drawingParameters.leftGear.x + leftGearXFactor * leftGearRadius;
-        const leftGearPivotY = drawingParameters.leftGear.y + leftGearYFactor * leftGearRadius;
+        const leftGearPivotX = drawingParameters.leftGear.x + leftGearXFactor * leftGearXRadius;
+        const leftGearPivotY = drawingParameters.leftGear.y + leftGearYFactor * leftGearYRadius;
         drawingParameters.leftGearPivotPoint.x = leftGearPivotX;
         drawingParameters.leftGearPivotPoint.y = leftGearPivotY;
+        drawingParameters.leftGearEllipsePoint.x = drawingParameters.leftGear.x + leftGearXRadius;
+        drawingParameters.leftGearEllipsePoint.y = drawingParameters.leftGear.y;
 
         let rightGearPivotX = drawingParameters.rightGear.x + rightGearXFactor * rightGearXRadius;
         let rightGearPivotY = drawingParameters.rightGear.y + rightGearYFactor * rightGearYRadius;
@@ -272,6 +284,7 @@ export class CyclographSimulator {
             if (drawControls) {
                 this.context.fillStyle = this.getControlColor();
                 this.context.strokeStyle = this.getControlColor();
+                this.context.lineWidth = this.getControlThickness();
                 this.context.beginPath();
                 this.context.arc(planetaryOuterGearPivotX, planetaryOuterGearPivotY, 2, 0, 2 * Math.PI);
                 this.context.fill();
@@ -329,6 +342,7 @@ export class CyclographSimulator {
             for (const key of Object.keys(draggables)) {
                 if (draggables[key].showWhen && !draggables[key].showWhen?.(drawingParameters)) continue;
                 this.context.strokeStyle = this.getTouchableColor();
+                this.context.lineWidth = this.getTouchableThickness();
                 this.context.beginPath();
                 this.context.arc(draggables[key].x, draggables[key].y, 20, 0, 2 * Math.PI);
                 this.context.stroke();
@@ -337,17 +351,17 @@ export class CyclographSimulator {
 
         if (!skipDraw && drawControls) {
             this.context.fillStyle = this.getControlColor();
-            this.context.lineWidth = 1;
+            this.context.lineWidth = this.getControlThickness();
             this.context.font = '12px Arial';
             this.context.fillText(drawingParameters.leftGear.teeth.toString(), drawingParameters.leftGear.x, drawingParameters.leftGear.y);
             this.context.fillText(drawingParameters.rightGear.teeth.toString(), drawingParameters.rightGear.x, drawingParameters.rightGear.y);
             this.context.fillText(drawingParameters.turntable.teeth.toString(), drawingParameters.turntable.x, drawingParameters.turntable.y - drawingParameters.turntable.radius - 20);
-            this.context.lineWidth = 0.5;
+            this.context.lineWidth = this.getControlThickness();
             this.context.strokeStyle = this.getControlColor();
             this.context.fillStyle = this.getControlColor();
 
             this.context.beginPath();
-            this.context.arc(drawingParameters.leftGear.x, drawingParameters.leftGear.y, leftGearRadius, 0, 2 * Math.PI);
+            this.context.ellipse(drawingParameters.leftGear.x, drawingParameters.leftGear.y, leftGearXRadius, leftGearYRadius, 0, 0, 2 * Math.PI);
             this.context.stroke();
             this.context.beginPath();
             this.context.arc(leftGearPivotX, leftGearPivotY, 2, 0, 2 * Math.PI);
@@ -426,7 +440,7 @@ export class CyclographSimulator {
         if (!drawExactlyOnce) {
             if (!skipVertexAddition) {
                 if (immediateFastPathActive && !drawingParameters.turntable.disabled) {
-                    const finalTurntableRotation = (this.neededRounds - rounds) * (drawingParameters.turntable.reversed ? -1 : 1);
+                    const finalTurntableRotation = (this.immediateFastPathTargetRounds - rounds) * (drawingParameters.turntable.reversed ? -1 : 1);
                     const projectedTargetPoint = rotatePointAroundPivot(
                         { x: targetPointX, y: targetPointY },
                         drawingParameters.turntable.x,
@@ -489,12 +503,16 @@ export class CyclographSimulator {
         const drawingParameters = this.store.drawingParameters;
         const draggables = this.store.draggables;
 
+        draggables.leftGearEllipsePoint.y = draggables.leftGear.y;
+        draggables.rightGearEllipsePoint.y = draggables.rightGear.y;
         drawingParameters.leftGear.x = draggables.leftGear.x;
         drawingParameters.leftGear.y = draggables.leftGear.y;
         drawingParameters.rightGear.x = draggables.rightGear.x;
         drawingParameters.rightGear.y = draggables.rightGear.y;
         drawingParameters.leftGearPivotPoint.x = draggables.leftGearPivotPoint.x;
         drawingParameters.leftGearPivotPoint.y = draggables.leftGearPivotPoint.y;
+        drawingParameters.leftGearEllipsePoint.x = draggables.leftGearEllipsePoint.x;
+        drawingParameters.leftGearEllipsePoint.y = draggables.leftGearEllipsePoint.y;
         drawingParameters.rightGearPivotPoint.x = draggables.rightGearPivotPoint.x;
         drawingParameters.rightGearPivotPoint.y = draggables.rightGearPivotPoint.y;
         drawingParameters.rightGearEllipsePoint.x = draggables.rightGearEllipsePoint.x;
@@ -506,10 +524,16 @@ export class CyclographSimulator {
         if (drawingParameters.planetaryGear.enabled) {
             rightGearPivotPointX = draggables.planetaryGearPivotPoint.x;
             rightGearPivotPointY = draggables.planetaryGearPivotPoint.y;
+
             draggables.leftGearPivotPoint.x = draggables.leftGear.x;
             draggables.leftGearPivotPoint.y = draggables.leftGear.y;
-            drawingParameters.leftGearPivotPoint.x = draggables.leftGearPivotPoint.x;
-            drawingParameters.leftGearPivotPoint.y = draggables.leftGearPivotPoint.y;
+            draggables.leftGearEllipsePoint.x = draggables.leftGear.x;
+            draggables.leftGearEllipsePoint.y = draggables.leftGear.y;
+
+            drawingParameters.leftGearPivotPoint.x = draggables.leftGear.x;
+            drawingParameters.leftGearPivotPoint.y = draggables.leftGear.y;
+            drawingParameters.leftGearEllipsePoint.x = draggables.leftGear.x;
+            drawingParameters.leftGearEllipsePoint.y = draggables.leftGear.y;
         }
 
         const pivotPointAngle = Math.atan2(rightGearPivotPointY - draggables.leftGearPivotPoint.y, rightGearPivotPointX - draggables.leftGearPivotPoint.x);
@@ -613,17 +637,25 @@ export class CyclographSimulator {
         this.currentRounds = 0;
         this.points = [];
         this.realPointCount = 0;
-        const stepSize = this.store.ui.stepSize;
-        for (let i = 0; i < this.neededRounds * 0.9; i += stepSize) {
-            this.calculatePoint(i, true);
+        this.immediateFastPath = true;
+        try {
+
+            const stepSize = this.store.ui.stepSize;
+            this.immediateFastPathTargetRounds = this.neededRounds * 0.9 - stepSize;
+
+            for (let i = 0; i < this.neededRounds * 0.9; i += stepSize) {
+                this.calculatePoint(i, true);
+            }
+            // this.calculatePoint(this.neededRounds * 0.9, false, true);
+        } finally {
+            this.immediateFastPath = false;
         }
-        this.calculatePoint(this.neededRounds * 0.9, false, true);
+
         this.isStopped = true;
         this.start();
     }
 
     immediate(isPreview = false, overrideStepSize?: number): void {
-        const start = performance.now();
         this.stop();
         this.calculateNeededRounds();
         if (!this.validateNeededRounds(!isPreview)) return;
@@ -633,6 +665,7 @@ export class CyclographSimulator {
         this.points = [];
         const stepSize = overrideStepSize ?? this.store.ui.stepSize;
         this.immediateFastPath = true;
+        this.immediateFastPathTargetRounds = this.neededRounds;
         try {
             for (let i = 0; i <= this.neededRounds; i += stepSize) {
                 this.calculatePoint(i, true);
@@ -644,8 +677,6 @@ export class CyclographSimulator {
         } finally {
             this.immediateFastPath = false;
         }
-        const end = performance.now();
-        console.log(`Immediate calculation took ${end - start} ms`);
     }
 
     restart(): void {
@@ -813,7 +844,7 @@ export class CyclographSimulator {
         const onMouseUp = (): void => {
             this.isDragging = false;
             this.clickedControl = null;
-            if (this.isStopped)
+            if (this.isStopped && this.store.ui.drawControls)
                 this.immediate(true)
         };
 

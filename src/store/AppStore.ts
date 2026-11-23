@@ -120,6 +120,7 @@ export class AppStore {
         mergedDrawing.turntable = { ...mergedDrawing.turntable, ...state.drawingParameters.turntable };
         mergedDrawing.planetaryGear = { ...mergedDrawing.planetaryGear, ...state.drawingParameters.planetaryGear };
         mergedDrawing.leftGearPivotPoint = { ...mergedDrawing.leftGearPivotPoint, ...state.drawingParameters.leftGearPivotPoint };
+        mergedDrawing.leftGearEllipsePoint = { ...mergedDrawing.leftGearEllipsePoint, ...state.drawingParameters.leftGearEllipsePoint };
         mergedDrawing.rightGearPivotPoint = { ...mergedDrawing.rightGearPivotPoint, ...state.drawingParameters.rightGearPivotPoint };
         mergedDrawing.rightGearEllipsePoint = { ...mergedDrawing.rightGearEllipsePoint, ...state.drawingParameters.rightGearEllipsePoint };
         mergedDrawing.simpleArm = { ...mergedDrawing.simpleArm, ...state.drawingParameters.simpleArm };
@@ -239,6 +240,8 @@ export class AppStore {
         this.draggables.leftGearPivotPoint.y = this.draggables.leftGear.y + this.ui.leftGearRadius;
         this.drawingParameters.leftGearPivotPoint.x = this.draggables.leftGearPivotPoint.x;
         this.drawingParameters.leftGearPivotPoint.y = this.draggables.leftGearPivotPoint.y;
+        this.drawingParameters.leftGearEllipsePoint.x = this.draggables.leftGearEllipsePoint.x;
+        this.drawingParameters.leftGearEllipsePoint.y = this.draggables.leftGearEllipsePoint.y;
 
         this.draggables.rightGearPivotPoint.x = this.draggables.rightGear.x;
         this.draggables.rightGearPivotPoint.y = this.draggables.rightGear.y + this.ui.rightGearRadius;
@@ -300,6 +303,7 @@ export class AppStore {
             merged.turntable = { ...merged.turntable, ...parsed.drawingParameters.turntable };
             merged.planetaryGear = { ...merged.planetaryGear, ...parsed.drawingParameters.planetaryGear };
             merged.leftGearPivotPoint = { ...merged.leftGearPivotPoint, ...parsed.drawingParameters.leftGearPivotPoint };
+            merged.leftGearEllipsePoint = { ...merged.leftGearEllipsePoint, ...parsed.drawingParameters.leftGearEllipsePoint };
             merged.rightGearPivotPoint = { ...merged.rightGearPivotPoint, ...parsed.drawingParameters.rightGearPivotPoint };
             merged.rightGearEllipsePoint = { ...merged.rightGearEllipsePoint, ...parsed.drawingParameters.rightGearEllipsePoint };
             merged.simpleArm = { ...merged.simpleArm, ...parsed.drawingParameters.simpleArm };

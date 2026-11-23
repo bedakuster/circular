@@ -42,6 +42,7 @@ export interface DrawingParameters {
     stepSize: number;
     speed: number;
     leftGearPivotPoint: Point & { draggable: boolean };
+    leftGearEllipsePoint: Point & { draggable: boolean };
     rightGearPivotPoint: Point & { draggable: boolean };
     rightGearEllipsePoint: Point & { draggable: boolean };
     simpleArm: { x: number; length: number; angle: number };
@@ -64,6 +65,7 @@ export type DraggablesMap = {
     leftGear: DraggablePoint;
     rightGear: DraggablePoint;
     leftGearPivotPoint: DraggablePoint;
+    leftGearEllipsePoint: DraggablePoint;
     rightGearPivotPoint: DraggablePoint;
     rightGearEllipsePoint: DraggablePoint;
     simpleArmAnglePoint: DraggablePoint;
@@ -112,13 +114,14 @@ export interface SavedCyclographState {
 }
 
 export const createDefaultDraggables = (): DraggablesMap => ({
-    leftGear: { id: 'leftGear', x: 100, y: 100, moveAlso: ['leftGearPivotPoint'] },
+    leftGear: { id: 'leftGear', x: 100, y: 100, moveAlso: ['leftGearPivotPoint', 'leftGearEllipsePoint'] },
     rightGear: { id: 'rightGear', x: 900, y: 100, moveAlso: ['rightGearPivotPoint', 'rightGearEllipsePoint', 'planetaryGearPivotPoint'] },
     leftGearPivotPoint: { id: 'leftGearPivotPoint', x: 100, y: 200, allowX: false },
+    leftGearEllipsePoint: { id: 'leftGearEllipsePoint', x: 200, y: 100, allowY: false },
     rightGearPivotPoint: { id: 'rightGearPivotPoint', x: 900, y: 200, allowX: false, moveAlso: ['planetaryGearPivotPoint'] },
     rightGearEllipsePoint: { id: 'rightGearEllipsePoint', x: 1000, y: 100, allowY: false },
     simpleArmAnglePoint: { id: 'simpleArmAnglePoint', x: 500, y: 500, showWhen: settings => settings.armType === 'Simple' },
-    simpleArmTipPoint: { id: 'simpleArmTipPoint', x: 500, y: 600, moveAlso: ['simpleArmAnglePoint'], showWhen: settings => settings.armType === 'Simple' },
+    simpleArmTipPoint: { id: 'simpleArmTipPoint', x: 500, y: 600, showWhen: settings => settings.armType === 'Simple' },
     planetaryGearPivotPoint: { id: 'planetaryGearPivotPoint', x: 900, y: 300, allowX: false, showWhen: settings => settings.planetaryGear.enabled },
     clawIntersectionPoint: { id: 'clawIntersectionPoint', x: 500, y: 400, moveAlso: ['clawEndPoint', 'leftClawEnd', 'rightClawEnd'], showWhen: settings => settings.armType === 'Claw' || settings.armType === 'SuperClaw' },
     leftClawEnd: { id: 'leftClawEnd', x: 600, y: 600, showWhen: settings => settings.armType === 'SuperClaw' },
@@ -136,6 +139,7 @@ export const createDefaultDrawingParameters = (): DrawingParameters => ({
     stepSize: 0.005,
     speed: 1,
     leftGearPivotPoint: { draggable: true, x: 100, y: 200 },
+    leftGearEllipsePoint: { draggable: true, x: 200, y: 100 },
     rightGearPivotPoint: { draggable: true, x: 900, y: 200 },
     rightGearEllipsePoint: { draggable: true, x: 1000, y: 100 },
     simpleArm: { x: 400, length: 400, angle: Math.PI / 2 },
