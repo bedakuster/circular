@@ -143,6 +143,7 @@ export class AppStore {
         this.storeSettings();
         this.simulator?.updateParamsFromStore(false);
         this.simulator?.reset();
+        this.simulator?.immediate()
     }
 
     importSavedStates(items: unknown): number {
@@ -211,6 +212,8 @@ export class AppStore {
         this.ui.reverseLeftGear = this.drawingParameters.leftGear.reversed;
         this.ui.reverseTurntable = this.drawingParameters.turntable.reversed;
         this.ui.disableTurntable = this.drawingParameters.turntable.disabled;
+        this.ui.leftGearEllipseEnabled = this.drawingParameters.leftGearEllipsePoint.draggable;
+        this.ui.rightGearEllipseEnabled = this.drawingParameters.rightGearEllipsePoint.draggable;
         this.ui.planetaryGearEnabled = this.drawingParameters.planetaryGear.enabled;
         this.ui.planetaryInnerGear = this.drawingParameters.planetaryGear.innerGear;
         this.ui.planetaryOuterGear = this.drawingParameters.planetaryGear.outerGear;
@@ -229,6 +232,8 @@ export class AppStore {
         this.drawingParameters.rightGear.reversed = this.ui.reverseRightGear;
         this.drawingParameters.turntable.reversed = this.ui.reverseTurntable;
         this.drawingParameters.turntable.disabled = this.ui.disableTurntable;
+        this.drawingParameters.leftGearEllipsePoint.draggable = this.ui.leftGearEllipseEnabled;
+        this.drawingParameters.rightGearEllipsePoint.draggable = this.ui.rightGearEllipseEnabled;
         this.drawingParameters.planetaryGear.enabled = this.ui.planetaryGearEnabled;
         this.drawingParameters.planetaryGear.innerGear = Math.round(this.ui.planetaryInnerGear);
         this.drawingParameters.planetaryGear.outerGear = Math.round(this.ui.planetaryOuterGear);
@@ -242,6 +247,13 @@ export class AppStore {
         this.drawingParameters.leftGearPivotPoint.y = this.draggables.leftGearPivotPoint.y;
         this.drawingParameters.leftGearEllipsePoint.x = this.draggables.leftGearEllipsePoint.x;
         this.drawingParameters.leftGearEllipsePoint.y = this.draggables.leftGearEllipsePoint.y;
+        if (!this.drawingParameters.leftGearEllipsePoint.draggable) {
+            const leftGearRadius = Math.abs(this.draggables.leftGearPivotPoint.y - this.draggables.leftGear.y);
+            this.draggables.leftGearEllipsePoint.x = this.draggables.leftGear.x + leftGearRadius;
+            this.draggables.leftGearEllipsePoint.y = this.draggables.leftGear.y;
+            this.drawingParameters.leftGearEllipsePoint.x = this.draggables.leftGearEllipsePoint.x;
+            this.drawingParameters.leftGearEllipsePoint.y = this.draggables.leftGearEllipsePoint.y;
+        }
 
         this.draggables.rightGearPivotPoint.x = this.draggables.rightGear.x;
         this.draggables.rightGearPivotPoint.y = this.draggables.rightGear.y + this.ui.rightGearRadius;
@@ -249,6 +261,13 @@ export class AppStore {
         this.drawingParameters.rightGearPivotPoint.y = this.draggables.rightGearPivotPoint.y;
         this.drawingParameters.rightGearEllipsePoint.x = this.draggables.rightGearEllipsePoint.x;
         this.drawingParameters.rightGearEllipsePoint.y = this.draggables.rightGearEllipsePoint.y;
+        if (!this.drawingParameters.rightGearEllipsePoint.draggable) {
+            const rightGearRadius = Math.abs(this.draggables.rightGearPivotPoint.y - this.draggables.rightGear.y);
+            this.draggables.rightGearEllipsePoint.x = this.draggables.rightGear.x + rightGearRadius;
+            this.draggables.rightGearEllipsePoint.y = this.draggables.rightGear.y;
+            this.drawingParameters.rightGearEllipsePoint.x = this.draggables.rightGearEllipsePoint.x;
+            this.drawingParameters.rightGearEllipsePoint.y = this.draggables.rightGearEllipsePoint.y;
+        }
 
         const pivotPointAngle = Math.atan2(this.drawingParameters.rightGearPivotPoint.y - this.drawingParameters.leftGearPivotPoint.y, this.drawingParameters.rightGearPivotPoint.x - this.drawingParameters.leftGearPivotPoint.x);
 

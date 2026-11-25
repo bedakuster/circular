@@ -80,7 +80,6 @@ export class CyclographSimulator {
     private points: DrawPoint[] = [];
     private realPointCount = 0;
     private pixelRatio = window.devicePixelRatio || 1;
-    private immediateFastPath = false;
     private immediateFastPathTargetRounds = 0;
 
     private isDragging = false;
@@ -203,10 +202,10 @@ export class CyclographSimulator {
         return Math.min(easedStepSize, maxStepToFinish);
     }
 
-    private calculatePoint(rounds: number, skipDraw = false, drawExactlyOnce = false, skipVertexAddition = false): boolean | void {
+    private calculatePoint(rounds: number, skipDraw = false, drawExactlyOnce = false, skipVertexAddition = false, immediate = false): boolean | void {
         const drawingParameters = this.store.drawingParameters;
         const draggables = this.store.draggables;
-        const immediateFastPathActive = this.immediateFastPath && skipDraw && !drawExactlyOnce && !skipVertexAddition;
+        const immediateFastPathActive = immediate && skipDraw && !drawExactlyOnce && !skipVertexAddition;
         if (!immediateFastPathActive) {
             this.drawInfo();
         }
@@ -214,9 +213,13 @@ export class CyclographSimulator {
         const leftGearRounds = (drawingParameters.turntable.teeth / drawingParameters.leftGear.teeth) * rounds * (drawingParameters.leftGear.reversed ? -1 : 1);
         const rightGearRounds = (drawingParameters.turntable.teeth / drawingParameters.rightGear.teeth) * rounds * (drawingParameters.rightGear.reversed ? -1 : 1);
         const leftGearYRadius = Math.abs(draggables.leftGearPivotPoint.y - drawingParameters.leftGear.y);
-        const leftGearXRadius = Math.abs(draggables.leftGearEllipsePoint.x - drawingParameters.leftGear.x);
+        const leftGearXRadius = drawingParameters.leftGearEllipsePoint.draggable
+            ? Math.abs(draggables.leftGearEllipsePoint.x - drawingParameters.leftGear.x)
+            : leftGearYRadius;
         const rightGearYRadius = Math.abs(draggables.rightGearPivotPoint.y - drawingParameters.rightGear.y);
-        const rightGearXRadius = Math.abs(draggables.rightGearEllipsePoint.x - drawingParameters.rightGear.x);
+        const rightGearXRadius = drawingParameters.rightGearEllipsePoint.draggable
+            ? Math.abs(draggables.rightGearEllipsePoint.x - drawingParameters.rightGear.x)
+            : rightGearYRadius;
         const leftGearYFactor = Math.cos(leftGearRounds * 2 * Math.PI);
         const leftGearXFactor = Math.sin(leftGearRounds * 2 * Math.PI);
         const rightGearYFactor = Math.cos(rightGearRounds * 2 * Math.PI);
@@ -513,14 +516,29 @@ export class CyclographSimulator {
         drawingParameters.leftGearPivotPoint.y = draggables.leftGearPivotPoint.y;
         drawingParameters.leftGearEllipsePoint.x = draggables.leftGearEllipsePoint.x;
         drawingParameters.leftGearEllipsePoint.y = draggables.leftGearEllipsePoint.y;
+        if (!drawingParameters.leftGearEllipsePoint.draggable) {
+            const leftGearRadius = Math.abs(draggables.leftGearPivotPoint.y - draggables.leftGear.y);
+            draggables.leftGearEllipsePoint.x = draggables.leftGear.x + leftGearRadius;
+            draggables.leftGearEllipsePoint.y = draggables.leftGear.y;
+            drawingParameters.leftGearEllipsePoint.x = draggables.leftGearEllipsePoint.x;
+            drawingParameters.leftGearEllipsePoint.y = draggables.leftGearEllipsePoint.y;
+        }
         drawingParameters.rightGearPivotPoint.x = draggables.rightGearPivotPoint.x;
         drawingParameters.rightGearPivotPoint.y = draggables.rightGearPivotPoint.y;
         drawingParameters.rightGearEllipsePoint.x = draggables.rightGearEllipsePoint.x;
         drawingParameters.rightGearEllipsePoint.y = draggables.rightGearEllipsePoint.y;
+        if (!drawingParameters.rightGearEllipsePoint.draggable) {
+            const rightGearRadius = Math.abs(draggables.rightGearPivotPoint.y - draggables.rightGear.y);
+            draggables.rightGearEllipsePoint.x = draggables.rightGear.x + rightGearRadius;
+            draggables.rightGearEllipsePoint.y = draggables.rightGear.y;
+            drawingParameters.rightGearEllipsePoint.x = draggables.rightGearEllipsePoint.x;
+            drawingParameters.rightGearEllipsePoint.y = draggables.rightGearEllipsePoint.y;
+        }
         drawingParameters.planetaryGear.radius = draggables.planetaryGearPivotPoint.y - draggables.rightGearPivotPoint.y;
 
         let rightGearPivotPointX = draggables.rightGearPivotPoint.x;
         let rightGearPivotPointY = draggables.rightGearPivotPoint.y;
+
         if (drawingParameters.planetaryGear.enabled) {
             rightGearPivotPointX = draggables.planetaryGearPivotPoint.x;
             rightGearPivotPointY = draggables.planetaryGearPivotPoint.y;
@@ -637,19 +655,21 @@ export class CyclographSimulator {
         this.currentRounds = 0;
         this.points = [];
         this.realPointCount = 0;
-        this.immediateFastPath = true;
-        try {
 
-            const stepSize = this.store.ui.stepSize;
-            this.immediateFastPathTargetRounds = this.neededRounds * 0.9 - stepSize;
 
-            for (let i = 0; i < this.neededRounds * 0.9; i += stepSize) {
-                this.calculatePoint(i, true);
-            }
-            // this.calculatePoint(this.neededRounds * 0.9, false, true);
-        } finally {
-            this.immediateFastPath = false;
+        const stepSize = this.store.ui.stepSize;
+        const perc90 = Math.floor(this.neededRounds * 0.9);
+        let targetSum = 0
+        for (let i = 0; i < perc90; i += stepSize) {
+            targetSum += stepSize;
         }
+
+        this.immediateFastPathTargetRounds = perc90;
+
+        for (let i = 0; i < perc90 - stepSize; i += stepSize) {
+            this.calculatePoint(i, true, false, false, true);
+        }
+        this.currentRounds = perc90
 
         this.isStopped = true;
         this.start();
@@ -664,19 +684,14 @@ export class CyclographSimulator {
         this.realPointCount = 0;
         this.points = [];
         const stepSize = overrideStepSize ?? this.store.ui.stepSize;
-        this.immediateFastPath = true;
         this.immediateFastPathTargetRounds = this.neededRounds;
-        try {
-            for (let i = 0; i <= this.neededRounds; i += stepSize) {
-                this.calculatePoint(i, true);
-            }
-            this.points = this.points.filter(p => p.keep || p.i > this.realPointCount - 100);
-            this.currentRounds = this.neededRounds;
-            this.drawInfo();
-            this.calculatePoint(this.neededRounds, false, true);
-        } finally {
-            this.immediateFastPath = false;
+        for (let i = 0; i <= this.neededRounds; i += stepSize) {
+            this.calculatePoint(i, true, false, false, true);
         }
+        this.points = this.points.filter(p => p.keep || p.i > this.realPointCount - 100);
+        this.currentRounds = this.neededRounds;
+        this.drawInfo();
+        this.calculatePoint(this.neededRounds, false, true);
     }
 
     restart(): void {

@@ -89,6 +89,8 @@ export interface UiState {
     reverseLeftGear: boolean;
     reverseTurntable: boolean;
     disableTurntable: boolean;
+    leftGearEllipseEnabled: boolean;
+    rightGearEllipseEnabled: boolean;
     planetaryGearEnabled: boolean;
     planetaryInnerGear: number;
     planetaryOuterGear: number;
@@ -117,9 +119,9 @@ export const createDefaultDraggables = (): DraggablesMap => ({
     leftGear: { id: 'leftGear', x: 100, y: 100, moveAlso: ['leftGearPivotPoint', 'leftGearEllipsePoint'] },
     rightGear: { id: 'rightGear', x: 900, y: 100, moveAlso: ['rightGearPivotPoint', 'rightGearEllipsePoint', 'planetaryGearPivotPoint'] },
     leftGearPivotPoint: { id: 'leftGearPivotPoint', x: 100, y: 200, allowX: false },
-    leftGearEllipsePoint: { id: 'leftGearEllipsePoint', x: 200, y: 100, allowY: false },
+    leftGearEllipsePoint: { id: 'leftGearEllipsePoint', x: 200, y: 100, allowY: false, showWhen: settings => settings.leftGearEllipsePoint.draggable },
     rightGearPivotPoint: { id: 'rightGearPivotPoint', x: 900, y: 200, allowX: false, moveAlso: ['planetaryGearPivotPoint'] },
-    rightGearEllipsePoint: { id: 'rightGearEllipsePoint', x: 1000, y: 100, allowY: false },
+    rightGearEllipsePoint: { id: 'rightGearEllipsePoint', x: 1000, y: 100, allowY: false, showWhen: settings => settings.rightGearEllipsePoint.draggable },
     simpleArmAnglePoint: { id: 'simpleArmAnglePoint', x: 500, y: 500, showWhen: settings => settings.armType === 'Simple' },
     simpleArmTipPoint: { id: 'simpleArmTipPoint', x: 500, y: 600, showWhen: settings => settings.armType === 'Simple' },
     planetaryGearPivotPoint: { id: 'planetaryGearPivotPoint', x: 900, y: 300, allowX: false, showWhen: settings => settings.planetaryGear.enabled },
@@ -139,9 +141,9 @@ export const createDefaultDrawingParameters = (): DrawingParameters => ({
     stepSize: 0.005,
     speed: 1,
     leftGearPivotPoint: { draggable: true, x: 100, y: 200 },
-    leftGearEllipsePoint: { draggable: true, x: 200, y: 100 },
+    leftGearEllipsePoint: { draggable: false, x: 200, y: 100 },
     rightGearPivotPoint: { draggable: true, x: 900, y: 200 },
-    rightGearEllipsePoint: { draggable: true, x: 1000, y: 100 },
+    rightGearEllipsePoint: { draggable: false, x: 1000, y: 100 },
     simpleArm: { x: 400, length: 400, angle: Math.PI / 2 },
     claw: {
         leftArm: { lengthToIntersection: 0, extensionLength: 0, scissorLength: 0 },
@@ -161,6 +163,8 @@ export const createDefaultUiState = (): UiState => ({
     reverseLeftGear: false,
     reverseTurntable: false,
     disableTurntable: false,
+    leftGearEllipseEnabled: false,
+    rightGearEllipseEnabled: false,
     planetaryGearEnabled: false,
     planetaryInnerGear: 12,
     planetaryOuterGear: 29,
