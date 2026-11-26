@@ -19,6 +19,13 @@ export interface TurntableSettings extends Point {
     disabled: boolean;
 }
 
+export interface TurntableCircularMovementSettings {
+    enabled: boolean;
+    teeth: number;
+    radiusX: number;
+    radiusY: number;
+}
+
 export interface PlanetaryGearSettings {
     innerGear: number;
     outerGear: number;
@@ -38,6 +45,7 @@ export interface DrawingParameters {
     anchor: AnchorType;
     armType: ArmType;
     turntable: TurntableSettings;
+    turntableCircularMovement: TurntableCircularMovementSettings;
     planetaryGear: PlanetaryGearSettings;
     stepSize: number;
     speed: number;
@@ -89,6 +97,10 @@ export interface UiState {
     reverseLeftGear: boolean;
     reverseTurntable: boolean;
     disableTurntable: boolean;
+    turntableCircularMovementEnabled: boolean;
+    turntableCircularMovementTeeth: number;
+    turntableCircularMovementRadiusX: number;
+    turntableCircularMovementRadiusY: number;
     leftGearEllipseEnabled: boolean;
     rightGearEllipseEnabled: boolean;
     planetaryGearEnabled: boolean;
@@ -137,6 +149,7 @@ export const createDefaultDrawingParameters = (): DrawingParameters => ({
     anchor: 'Left',
     armType: 'Simple',
     turntable: { x: 500, y: 500, radius: 400, teeth: 60, reversed: false, disabled: false },
+    turntableCircularMovement: { enabled: true, teeth: 60, radiusX: 100, radiusY: 100 },
     planetaryGear: { innerGear: 12, outerGear: 29, radius: 100, enabled: false },
     stepSize: 0.005,
     speed: 1,
@@ -163,6 +176,10 @@ export const createDefaultUiState = (): UiState => ({
     reverseLeftGear: false,
     reverseTurntable: false,
     disableTurntable: false,
+    turntableCircularMovementEnabled: true,
+    turntableCircularMovementTeeth: 60,
+    turntableCircularMovementRadiusX: 100,
+    turntableCircularMovementRadiusY: 100,
     leftGearEllipseEnabled: false,
     rightGearEllipseEnabled: false,
     planetaryGearEnabled: false,

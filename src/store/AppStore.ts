@@ -118,6 +118,7 @@ export class AppStore {
         mergedDrawing.leftGear = { ...mergedDrawing.leftGear, ...state.drawingParameters.leftGear };
         mergedDrawing.rightGear = { ...mergedDrawing.rightGear, ...state.drawingParameters.rightGear };
         mergedDrawing.turntable = { ...mergedDrawing.turntable, ...state.drawingParameters.turntable };
+        mergedDrawing.turntableCircularMovement = { ...mergedDrawing.turntableCircularMovement, ...state.drawingParameters.turntableCircularMovement };
         mergedDrawing.planetaryGear = { ...mergedDrawing.planetaryGear, ...state.drawingParameters.planetaryGear };
         mergedDrawing.leftGearPivotPoint = { ...mergedDrawing.leftGearPivotPoint, ...state.drawingParameters.leftGearPivotPoint };
         mergedDrawing.leftGearEllipsePoint = { ...mergedDrawing.leftGearEllipsePoint, ...state.drawingParameters.leftGearEllipsePoint };
@@ -212,6 +213,10 @@ export class AppStore {
         this.ui.reverseLeftGear = this.drawingParameters.leftGear.reversed;
         this.ui.reverseTurntable = this.drawingParameters.turntable.reversed;
         this.ui.disableTurntable = this.drawingParameters.turntable.disabled;
+        this.ui.turntableCircularMovementEnabled = this.drawingParameters.turntableCircularMovement.enabled;
+        this.ui.turntableCircularMovementTeeth = this.drawingParameters.turntableCircularMovement.teeth;
+        this.ui.turntableCircularMovementRadiusX = this.drawingParameters.turntableCircularMovement.radiusX;
+        this.ui.turntableCircularMovementRadiusY = this.drawingParameters.turntableCircularMovement.radiusY;
         this.ui.leftGearEllipseEnabled = this.drawingParameters.leftGearEllipsePoint.draggable;
         this.ui.rightGearEllipseEnabled = this.drawingParameters.rightGearEllipsePoint.draggable;
         this.ui.planetaryGearEnabled = this.drawingParameters.planetaryGear.enabled;
@@ -232,6 +237,10 @@ export class AppStore {
         this.drawingParameters.rightGear.reversed = this.ui.reverseRightGear;
         this.drawingParameters.turntable.reversed = this.ui.reverseTurntable;
         this.drawingParameters.turntable.disabled = this.ui.disableTurntable;
+        this.drawingParameters.turntableCircularMovement.enabled = this.ui.turntableCircularMovementEnabled;
+        this.drawingParameters.turntableCircularMovement.teeth = Math.max(1, Math.round(this.ui.turntableCircularMovementTeeth));
+        this.drawingParameters.turntableCircularMovement.radiusX = this.ui.turntableCircularMovementRadiusX;
+        this.drawingParameters.turntableCircularMovement.radiusY = this.ui.turntableCircularMovementRadiusY;
         this.drawingParameters.leftGearEllipsePoint.draggable = this.ui.leftGearEllipseEnabled;
         this.drawingParameters.rightGearEllipsePoint.draggable = this.ui.rightGearEllipseEnabled;
         this.drawingParameters.planetaryGear.enabled = this.ui.planetaryGearEnabled;
@@ -320,6 +329,7 @@ export class AppStore {
             merged.leftGear = { ...merged.leftGear, ...parsed.drawingParameters.leftGear };
             merged.rightGear = { ...merged.rightGear, ...parsed.drawingParameters.rightGear };
             merged.turntable = { ...merged.turntable, ...parsed.drawingParameters.turntable };
+            merged.turntableCircularMovement = { ...merged.turntableCircularMovement, ...parsed.drawingParameters.turntableCircularMovement };
             merged.planetaryGear = { ...merged.planetaryGear, ...parsed.drawingParameters.planetaryGear };
             merged.leftGearPivotPoint = { ...merged.leftGearPivotPoint, ...parsed.drawingParameters.leftGearPivotPoint };
             merged.leftGearEllipsePoint = { ...merged.leftGearEllipsePoint, ...parsed.drawingParameters.leftGearEllipsePoint };

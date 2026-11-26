@@ -148,6 +148,29 @@ export class CyclographSimulator {
         return 1;
     }
 
+    private getControlEffectColor(): string {
+        return this.isDarkMode() ? 'rgba(107, 188, 255, 0.65)' : 'rgba(0, 60, 145, 0.35)';
+    }
+
+    private getTouchableEffectColor(): string {
+        return this.isDarkMode() ? 'rgba(107, 188, 255, 0.75)' : 'rgba(0, 23, 71, 0.4)';
+    }
+
+    private getControlEffectBlur(): number {
+        return this.isDarkMode() ? 10 : 8;
+    }
+
+    private getTouchableEffectBlur(): number {
+        return this.isDarkMode() ? 12 : 10;
+    }
+
+    private applyCanvasEffect(effectColor: string, blur: number): void {
+        // this.context.shadowColor = effectColor;
+        // this.context.shadowBlur = blur;
+        // this.context.shadowOffsetX = 0;
+        // this.context.shadowOffsetY = this.isDarkMode() ? 0 : 1;
+    }
+
     private getTouchableColor(): string {
         return this.isDarkMode() ? '#6bbcff' : '#001747';
     }
@@ -206,6 +229,7 @@ export class CyclographSimulator {
         const drawingParameters = this.store.drawingParameters;
         const draggables = this.store.draggables;
         const immediateFastPathActive = immediate && skipDraw && !drawExactlyOnce && !skipVertexAddition;
+
         if (!immediateFastPathActive) {
             this.drawInfo();
         }
@@ -227,29 +251,65 @@ export class CyclographSimulator {
         const turntableYFactor = Math.cos(rounds * 2 * Math.PI * (drawingParameters.turntable.disabled ? 0 : drawingParameters.turntable.reversed ? -1 : 1));
         const turntableXFactor = Math.sin(rounds * 2 * Math.PI * (drawingParameters.turntable.disabled ? 0 : drawingParameters.turntable.reversed ? -1 : 1));
 
+        const turntableCircularMovement = drawingParameters.turntableCircularMovement;
+        const turntableCircularMovementTeeth = Math.max(1, turntableCircularMovement.teeth);
+        const turntableCircularMovementRadiusX = turntableCircularMovement.enabled ? turntableCircularMovement.radiusX : 0;
+        const turntableCircularMovementRadiusY = turntableCircularMovement.enabled ? turntableCircularMovement.radiusY : 0;
+        const turntableCircularMovementRounds = (drawingParameters.turntable.teeth / turntableCircularMovementTeeth) * rounds;
+        const previousTurntableCircularMovementRounds = (drawingParameters.turntable.teeth / turntableCircularMovementTeeth) * this.currentRounds;
+        const turntableCircularMovementX = Math.cos(turntableCircularMovementRounds * 2 * Math.PI);
+        const turntableCircularMovementY = Math.sin(turntableCircularMovementRounds * 2 * Math.PI);
+        const previousTurntableCircularMovementX = Math.cos(previousTurntableCircularMovementRounds * 2 * Math.PI);
+        const previousTurntableCircularMovementY = Math.sin(previousTurntableCircularMovementRounds * 2 * Math.PI);
+
+
+        // const turntableCenterX = drawingParameters.turntable.x;
+        // const turntableCenterY = drawingParameters.turntable.y;
+
+        const previousTurntableCenterX = drawingParameters.turntable.x + previousTurntableCircularMovementX * turntableCircularMovementRadiusX;
+        const previousTurntableCenterY = drawingParameters.turntable.y + previousTurntableCircularMovementY * turntableCircularMovementRadiusY;
+        const turntableCenterX = drawingParameters.turntable.x + turntableCircularMovementX * turntableCircularMovementRadiusX;
+        const turntableCenterY = drawingParameters.turntable.y + turntableCircularMovementY * turntableCircularMovementRadiusY;
+        const turntableTranslationX = turntableCenterX - previousTurntableCenterX;
+        const turntableTranslationY = turntableCenterY - previousTurntableCenterY;
+
+
         if (!skipDraw) {
+            this.applyCanvasEffect('', 0);
             this.context.fillStyle = this.getCanvasBackgroundColor();
             this.context.fillRect(-10000, -10000, this.canvas.width * 100, this.canvas.height * 100);
         }
 
         if (!immediateFastPathActive) {
             this.points = this.points.filter(p => p.keep || p.i > this.realPointCount - 100);
-            if (!drawingParameters.turntable.disabled) {
-                for (const p of this.points) {
-                    const rotatedPoint = rotatePointAroundPivot(
+
+            for (let p of this.points) {
+                if (!drawingParameters.turntable.disabled) {
+                    let rotatedPoint = rotatePointAroundPivot(
                         p,
-                        drawingParameters.turntable.x,
-                        drawingParameters.turntable.y,
+                        previousTurntableCenterX,
+                        previousTurntableCenterY,
                         (rounds - this.currentRounds) * (drawingParameters.turntable.reversed ? -1 : 1),
                     );
                     p.x = rotatedPoint.x;
                     p.y = rotatedPoint.y;
                 }
+
+                if (turntableTranslationX !== 0 || turntableTranslationY !== 0) {
+                    p.x += turntableTranslationX;
+                    p.y += turntableTranslationY;
+                }
             }
+
+            // if (!drawingParameters.turntable.disabled) {
+
+            // }
         }
 
-        if (!skipDraw) this.drawPattern();
-
+        if (!skipDraw) {
+            this.applyCanvasEffect('', 0)
+            this.drawPattern();
+        }
         const leftGearPivotX = drawingParameters.leftGear.x + leftGearXFactor * leftGearXRadius;
         const leftGearPivotY = drawingParameters.leftGear.y + leftGearYFactor * leftGearYRadius;
         drawingParameters.leftGearPivotPoint.x = leftGearPivotX;
@@ -263,9 +323,6 @@ export class CyclographSimulator {
         drawingParameters.rightGearPivotPoint.y = rightGearPivotY;
         drawingParameters.rightGearEllipsePoint.x = drawingParameters.rightGear.x + rightGearXRadius;
         drawingParameters.rightGearEllipsePoint.y = drawingParameters.rightGear.y;
-
-        const turntableCenterX = drawingParameters.turntable.x;
-        const turntableCenterY = drawingParameters.turntable.y;
 
         const turntableCurrentX = turntableCenterX + turntableXFactor * drawingParameters.turntable.radius;
         const turntableCurrentY = turntableCenterY + turntableYFactor * drawingParameters.turntable.radius;
@@ -288,6 +345,7 @@ export class CyclographSimulator {
                 this.context.fillStyle = this.getControlColor();
                 this.context.strokeStyle = this.getControlColor();
                 this.context.lineWidth = this.getControlThickness();
+                this.applyCanvasEffect(this.getControlEffectColor(), this.getControlEffectBlur());
                 this.context.beginPath();
                 this.context.arc(planetaryOuterGearPivotX, planetaryOuterGearPivotY, 2, 0, 2 * Math.PI);
                 this.context.fill();
@@ -340,8 +398,9 @@ export class CyclographSimulator {
             targetPointY = targetPoint.y;
         }
 
-        if (drawControls && this.isStopped) {
+        if (!skipDraw && drawControls && this.isStopped) {
             this.context.fillStyle = 'green';
+            this.applyCanvasEffect(this.getTouchableEffectColor(), this.getTouchableEffectBlur());
             for (const key of Object.keys(draggables)) {
                 if (draggables[key].showWhen && !draggables[key].showWhen?.(drawingParameters)) continue;
                 this.context.strokeStyle = this.getTouchableColor();
@@ -356,6 +415,7 @@ export class CyclographSimulator {
             this.context.fillStyle = this.getControlColor();
             this.context.lineWidth = this.getControlThickness();
             this.context.font = '12px Arial';
+            this.applyCanvasEffect(this.getControlEffectColor(), this.getControlEffectBlur());
             this.context.fillText(drawingParameters.leftGear.teeth.toString(), drawingParameters.leftGear.x, drawingParameters.leftGear.y);
             this.context.fillText(drawingParameters.rightGear.teeth.toString(), drawingParameters.rightGear.x, drawingParameters.rightGear.y);
             this.context.fillText(drawingParameters.turntable.teeth.toString(), drawingParameters.turntable.x, drawingParameters.turntable.y - drawingParameters.turntable.radius - 20);
@@ -434,24 +494,43 @@ export class CyclographSimulator {
         }
 
         if ((!skipDraw && rounds < this.neededRounds) || drawControls) {
-            this.context.fillStyle = drawControls ? this.getControlColor() : this.getStrokeColor();
-            this.context.beginPath();
-            this.context.arc(targetPointX, targetPointY, 2, 0, 2 * Math.PI);
-            this.context.fill();
+            if (drawControls) {
+                this.context.fillStyle = this.getControlColor();
+                this.applyCanvasEffect(this.getControlEffectColor(), this.getControlEffectBlur());
+                this.context.beginPath();
+                this.context.arc(targetPointX, targetPointY, 2, 0, 2 * Math.PI);
+                this.context.fill();
+            } else {
+                this.context.fillStyle = this.getStrokeColor();
+                this.context.beginPath();
+                this.context.arc(targetPointX, targetPointY, 2, 0, 2 * Math.PI);
+                this.context.fill();
+            }
         }
 
         if (!drawExactlyOnce) {
             if (!skipVertexAddition) {
-                if (immediateFastPathActive && !drawingParameters.turntable.disabled) {
-                    const finalTurntableRotation = (this.immediateFastPathTargetRounds - rounds) * (drawingParameters.turntable.reversed ? -1 : 1);
-                    const projectedTargetPoint = rotatePointAroundPivot(
-                        { x: targetPointX, y: targetPointY },
-                        drawingParameters.turntable.x,
-                        drawingParameters.turntable.y,
-                        finalTurntableRotation,
-                    );
-                    targetPointX = projectedTargetPoint.x;
-                    targetPointY = projectedTargetPoint.y;
+                if (immediateFastPathActive) {
+                    const targetTurntableCircularMovementRounds = (drawingParameters.turntable.teeth / turntableCircularMovementTeeth) * this.immediateFastPathTargetRounds;
+                    const targetTurntableCircularMovementX = Math.cos(targetTurntableCircularMovementRounds * 2 * Math.PI);
+                    const targetTurntableCircularMovementY = Math.sin(targetTurntableCircularMovementRounds * 2 * Math.PI);
+                    const targetTurntableCenterX = drawingParameters.turntable.x + targetTurntableCircularMovementX * turntableCircularMovementRadiusX;
+                    const targetTurntableCenterY = drawingParameters.turntable.y + targetTurntableCircularMovementY * turntableCircularMovementRadiusY;
+
+                    if (!drawingParameters.turntable.disabled) {
+                        const finalTurntableRotation = (this.immediateFastPathTargetRounds - rounds) * (drawingParameters.turntable.reversed ? -1 : 1);
+                        const projectedTargetPoint = rotatePointAroundPivot(
+                            { x: targetPointX, y: targetPointY },
+                            turntableCenterX,
+                            turntableCenterY,
+                            finalTurntableRotation,
+                        );
+                        targetPointX = projectedTargetPoint.x;
+                        targetPointY = projectedTargetPoint.y;
+                    }
+
+                    targetPointX += targetTurntableCenterX - turntableCenterX;
+                    targetPointY += targetTurntableCenterY - turntableCenterY;
                 }
                 this.points.push({ keep: true, i: this.realPointCount, x: targetPointX, y: targetPointY });
                 this.realPointCount++;
@@ -485,6 +564,8 @@ export class CyclographSimulator {
 
     private calculateNeededRounds(): void {
         const drawingParameters = this.store.drawingParameters;
+
+
         if (drawingParameters.planetaryGear.enabled) {
             this.neededRounds =
                 (Math.min(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth) /
@@ -495,9 +576,12 @@ export class CyclographSimulator {
                 (Math.min(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth) /
                     gcd(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth)) *
                 drawingParameters.leftGear.teeth / gcd(drawingParameters.turntable.teeth, drawingParameters.leftGear.teeth);
+        
         }
         if (drawingParameters.turntable.disabled) {
             this.neededRounds = (drawingParameters.rightGear.teeth / drawingParameters.turntable.teeth) * drawingParameters.leftGear.teeth;
+
+            
         }
         this.store.neededRounds = this.neededRounds;
     }
@@ -516,6 +600,7 @@ export class CyclographSimulator {
         drawingParameters.leftGearPivotPoint.y = draggables.leftGearPivotPoint.y;
         drawingParameters.leftGearEllipsePoint.x = draggables.leftGearEllipsePoint.x;
         drawingParameters.leftGearEllipsePoint.y = draggables.leftGearEllipsePoint.y;
+
         if (!drawingParameters.leftGearEllipsePoint.draggable) {
             const leftGearRadius = Math.abs(draggables.leftGearPivotPoint.y - draggables.leftGear.y);
             draggables.leftGearEllipsePoint.x = draggables.leftGear.x + leftGearRadius;
@@ -527,6 +612,7 @@ export class CyclographSimulator {
         drawingParameters.rightGearPivotPoint.y = draggables.rightGearPivotPoint.y;
         drawingParameters.rightGearEllipsePoint.x = draggables.rightGearEllipsePoint.x;
         drawingParameters.rightGearEllipsePoint.y = draggables.rightGearEllipsePoint.y;
+
         if (!drawingParameters.rightGearEllipsePoint.draggable) {
             const rightGearRadius = Math.abs(draggables.rightGearPivotPoint.y - draggables.rightGear.y);
             draggables.rightGearEllipsePoint.x = draggables.rightGear.x + rightGearRadius;
@@ -691,7 +777,7 @@ export class CyclographSimulator {
         this.points = this.points.filter(p => p.keep || p.i > this.realPointCount - 100);
         this.currentRounds = this.neededRounds;
         this.drawInfo();
-        this.calculatePoint(this.neededRounds, false, true);
+        this.calculatePoint(0, false, true);
     }
 
     restart(): void {
@@ -848,7 +934,7 @@ export class CyclographSimulator {
                     this.dragStartPosition = this.getTransformedPoint(canvasPoint.x, canvasPoint.y);
                     this.updateDrawingSettingsFromDraggables();
                     this.store.storeSettings();
-                    this.calculatePoint(this.currentRounds, false, true);
+                    // this.calculatePoint(this.currentRounds, false, true);
                 } else {
                     this.context.translate(this.currentTransformedCursor.x - this.dragStartPosition.x, this.currentTransformedCursor.y - this.dragStartPosition.y);
                     this.calculatePoint(this.currentRounds, false, true);
