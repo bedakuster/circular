@@ -121,17 +121,6 @@ export const App = observer((): ReactElement => {
 
                     <div className="panel"><button onClick={() => simulatorRef.current?.immediate()}>Immediate Result</button></div>
                     <div className="panel">
-                        <button onClick={() => simulatorRef.current?.startRecording()}>Start Recording</button>
-                        <button onClick={() => simulatorRef.current?.stopRecording()}>Stop Recording</button>
-                    </div>
-                    <div className="panel">
-                        <button onClick={() => simulatorRef.current?.start()}>Start Animation</button>
-                        <button onClick={() => simulatorRef.current?.stop()}>Stop Animation</button>
-                        <button onClick={() => simulatorRef.current?.reset()}>Reset</button>
-                        <button onClick={() => simulatorRef.current?.restart()}>Restart Animation</button>
-                        <button onClick={() => simulatorRef.current?.last10Percents()}>Last 10%</button>
-                    </div>
-                    <div className="panel">
                         <button
                             type="button"
                             onClick={() => {
@@ -155,6 +144,15 @@ export const App = observer((): ReactElement => {
                         <div className="panel warning">{appStore.warning}</div>
                     }
                     <div className="canvas-container">
+                        <div className="canvas-toolbar" role="toolbar" aria-label="Animation controls">
+                            <button type="button" className="canvas-toolbar-button" title="Start recording" aria-label="Start recording" onClick={() => simulatorRef.current?.startRecording()}>⏺</button>
+                            <button type="button" className="canvas-toolbar-button" title="Stop recording" aria-label="Stop recording" onClick={() => simulatorRef.current?.stopRecording()}>⏹</button>
+                            <button type="button" className="canvas-toolbar-button" title="Start animation" aria-label="Start animation" onClick={() => simulatorRef.current?.start()}>▶</button>
+                            <button type="button" className="canvas-toolbar-button" title="Stop animation" aria-label="Stop animation" onClick={() => simulatorRef.current?.stop()}>⏸</button>
+                            <button type="button" className="canvas-toolbar-button" title="Reset" aria-label="Reset" onClick={() => simulatorRef.current?.reset()}>↺</button>
+                            <button type="button" className="canvas-toolbar-button" title="Restart animation" aria-label="Restart animation" onClick={() => simulatorRef.current?.restart()}>⟲</button>
+                            <button type="button" className="canvas-toolbar-button" title="Play last 10%" aria-label="Play last ten percent" onClick={() => simulatorRef.current?.last10Percents()}>⏭</button>
+                        </div>
                         <canvas height={900} width={1000} id="c" ref={canvasRef} />
                     </div>
                 </div>

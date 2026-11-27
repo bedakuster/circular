@@ -91,7 +91,7 @@ export class CyclographSimulator {
     private currentRounds = 0;
     private points: DrawPoint[] = [];
     private realPointCount = 0;
-    private pixelRatio = Math.max(window.devicePixelRatio, 2);
+    private pixelRatio = Math.max(window.devicePixelRatio, 1);
     private immediateFastPathTargetRounds = 0;
     private mediaRecorder: MediaRecorder | null = null;
     private recordingChunks: Blob[] = [];
@@ -229,7 +229,7 @@ export class CyclographSimulator {
                 target: new BufferTarget(),
             });
             const videoSource = new CanvasSource(this.canvas, {
-                codec: 'avc',
+                codec: 'hevc',
                 bitrate: Math.max(1_000_000, Math.floor(width * height * 8)),
                 keyFrameInterval: 2,
             });
@@ -346,7 +346,9 @@ export class CyclographSimulator {
     }
 
     private getControlColor(): string {
-        return this.isDarkMode() ? '#3586f8' : '#003c91';
+        if(!this.isStopped) 
+            return this.isDarkMode() ? '#777777' : '#494949';
+        return this.isDarkMode() ? '#6bbcff' : '#001747';
     }
 
     private getControlThickness(): number {
@@ -410,30 +412,29 @@ export class CyclographSimulator {
         if (remainingRounds <= 0) return baseStepSize;
 
         const easeInMinFactor = 0.15;
-        const easeOutMinFactor = 0.1;
+        const easeOutMinFactor = 0.05;
         const easeInWindow = 1;
         const easeOutWindow = 1;
         let easeInFactor = 1;
         let easeOutFactor = 1;
 
         const clamp01 = (t: number): number => Math.min(1, Math.max(0, t));
-        const circularEaseIn = (t: number): number => {
+        const sineEaseIn = (t: number): number => {
             const clamped = clamp01(t);
-            return 1 - Math.sqrt(Math.max(0, 1 - clamped * clamped));
+            return 1 - Math.cos((clamped * Math.PI) / 2);
         };
-        const circularEaseOut = (t: number): number => {
+        const sineEaseOut = (t: number): number => {
             const clamped = clamp01(t);
-            const inverse = clamped - 1;
-            return Math.sqrt(Math.max(0, 1 - inverse * inverse));
+            return Math.sin((clamped * Math.PI) / 2);
         };
 
         if (rounds < easeInWindow) {
             const normalizedProgress = Math.max(0, rounds) / easeInWindow;
-            easeInFactor = easeInMinFactor + (1 - easeInMinFactor) * circularEaseIn(normalizedProgress);
+            easeInFactor = easeInMinFactor + (1 - easeInMinFactor) * sineEaseIn(normalizedProgress);
         }
         if (remainingRounds < easeOutWindow) {
             const normalizedRemaining = Math.max(0, remainingRounds) / easeOutWindow;
-            easeOutFactor = easeOutMinFactor + (1 - easeOutMinFactor) * circularEaseOut(normalizedRemaining);
+            easeOutFactor = easeOutMinFactor + (1 - easeOutMinFactor) * sineEaseOut(normalizedRemaining);
         }
 
         const easedFactor = Math.min(easeInFactor, easeOutFactor);
@@ -446,13 +447,14 @@ export class CyclographSimulator {
         const drawingParameters = this.store.drawingParameters;
         const draggables = this.store.draggables;
         const immediateFastPathActive = immediate && skipDraw && !drawExactlyOnce && !skipVertexAddition;
+        const clampedRounds = Math.min(rounds, this.neededRounds);
 
         if (!immediateFastPathActive) {
             this.drawInfo();
         }
 
-        const leftGearRounds = (drawingParameters.turntable.teeth / drawingParameters.leftGear.teeth) * rounds * (drawingParameters.leftGear.reversed ? -1 : 1);
-        const rightGearRounds = (drawingParameters.turntable.teeth / drawingParameters.rightGear.teeth) * rounds * (drawingParameters.rightGear.reversed ? -1 : 1);
+        const leftGearRounds = (drawingParameters.turntable.teeth / drawingParameters.leftGear.teeth) * clampedRounds * (drawingParameters.leftGear.reversed ? -1 : 1);
+        const rightGearRounds = (drawingParameters.turntable.teeth / drawingParameters.rightGear.teeth) * clampedRounds * (drawingParameters.rightGear.reversed ? -1 : 1);
         const leftGearYRadius = Math.abs(draggables.leftGearPivotPoint.y - drawingParameters.leftGear.y);
         const leftGearXRadius = drawingParameters.leftGearEllipsePoint.draggable
             ? Math.abs(draggables.leftGearEllipsePoint.x - drawingParameters.leftGear.x)
@@ -465,14 +467,14 @@ export class CyclographSimulator {
         const leftGearXFactor = Math.sin(leftGearRounds * 2 * Math.PI);
         const rightGearYFactor = Math.cos(rightGearRounds * 2 * Math.PI);
         const rightGearXFactor = Math.sin(rightGearRounds * 2 * Math.PI);
-        const turntableYFactor = Math.cos(rounds * 2 * Math.PI * (drawingParameters.turntable.disabled ? 0 : drawingParameters.turntable.reversed ? -1 : 1));
-        const turntableXFactor = Math.sin(rounds * 2 * Math.PI * (drawingParameters.turntable.disabled ? 0 : drawingParameters.turntable.reversed ? -1 : 1));
+        const turntableYFactor = Math.cos(clampedRounds * 2 * Math.PI * (drawingParameters.turntable.disabled ? 0 : drawingParameters.turntable.reversed ? -1 : 1));
+        const turntableXFactor = Math.sin(clampedRounds * 2 * Math.PI * (drawingParameters.turntable.disabled ? 0 : drawingParameters.turntable.reversed ? -1 : 1));
 
         const turntableCircularMovement = drawingParameters.turntableCircularMovement;
         const turntableCircularMovementTeeth = Math.max(1, turntableCircularMovement.teeth);
         const turntableCircularMovementRadiusX = turntableCircularMovement.enabled ? turntableCircularMovement.radiusX : 0;
         const turntableCircularMovementRadiusY = turntableCircularMovement.enabled ? turntableCircularMovement.radiusY : 0;
-        const turntableCircularMovementRounds = (drawingParameters.turntable.teeth / turntableCircularMovementTeeth) * rounds;
+        const turntableCircularMovementRounds = (drawingParameters.turntable.teeth / turntableCircularMovementTeeth) * clampedRounds;
         const previousTurntableCircularMovementRounds = (drawingParameters.turntable.teeth / turntableCircularMovementTeeth) * this.currentRounds;
         const turntableCircularMovementX = Math.cos(turntableCircularMovementRounds * 2 * Math.PI);
         const turntableCircularMovementY = Math.sin(turntableCircularMovementRounds * 2 * Math.PI);
@@ -506,7 +508,7 @@ export class CyclographSimulator {
                         p,
                         previousTurntableCenterX,
                         previousTurntableCenterY,
-                        (rounds - this.currentRounds) * (drawingParameters.turntable.reversed ? -1 : 1),
+                        (clampedRounds - this.currentRounds) * (drawingParameters.turntable.reversed ? -1 : 1),
                     );
                     p.x = rotatedPoint.x;
                     p.y = rotatedPoint.y;
@@ -713,7 +715,7 @@ export class CyclographSimulator {
             }
         }
 
-        if ((!skipDraw && rounds < this.neededRounds) || drawControls) {
+        if ((!skipDraw && clampedRounds < this.neededRounds) || drawControls) {
             if (drawControls) {
                 this.context.fillStyle = this.getControlColor();
                 this.applyCanvasEffect(this.getControlEffectColor(), this.getControlEffectBlur());
@@ -738,7 +740,7 @@ export class CyclographSimulator {
                     const targetTurntableCenterY = drawingParameters.turntable.y + targetTurntableCircularMovementY * turntableCircularMovementRadiusY;
 
                     if (!drawingParameters.turntable.disabled) {
-                        const finalTurntableRotation = (this.immediateFastPathTargetRounds - rounds) * (drawingParameters.turntable.reversed ? -1 : 1);
+                        const finalTurntableRotation = (this.immediateFastPathTargetRounds - clampedRounds) * (drawingParameters.turntable.reversed ? -1 : 1);
                         const projectedTargetPoint = rotatePointAroundPivot(
                             { x: targetPointX, y: targetPointY },
                             turntableCenterX,
@@ -758,7 +760,7 @@ export class CyclographSimulator {
                     this.points[this.points.length - 1].keep = false;
                 }
             }
-            this.currentRounds = rounds;
+            this.currentRounds = clampedRounds;
         }
 
         if (rounds > this.neededRounds) {
@@ -776,7 +778,7 @@ export class CyclographSimulator {
         const speed = this.store.ui.speed;
         const stepSize = this.getEasedStepSize(baseStepSize, this.currentRounds, speed);
         for (let i = 0; i < speed - 1; i++) {
-            const shouldContinue = this.calculatePoint(rounds + stepSize * (i + 1), true);
+            const shouldContinue = this.calculatePoint(clampedRounds + stepSize * (i + 1), true);
             if (this.currentRounds >= this.neededRounds || shouldContinue === false) {
                 this.calculatePoint(this.currentRounds, false, true);
                 return;
@@ -968,7 +970,7 @@ export class CyclographSimulator {
 
 
         const stepSize = this.store.ui.stepSize;
-        const perc90 = Math.floor(this.neededRounds * 0.999);
+        const perc90 = Math.floor(this.neededRounds * 0.90);
         let targetSum = 0
         for (let i = 0; i < perc90; i += stepSize) {
             targetSum += stepSize;
@@ -1054,10 +1056,16 @@ export class CyclographSimulator {
 
     resize(): void {
         const canvasContainer = this.canvas.closest('.canvas-container') as HTMLElement | null;
-        let width = canvasContainer ? canvasContainer.clientWidth : document.documentElement.clientWidth;
-        let height = canvasContainer ? canvasContainer.clientHeight : document.documentElement.clientHeight;
+
+        let width = Math.floor(canvasContainer ? canvasContainer.clientWidth : document.documentElement.clientWidth);
+        let height = Math.floor(canvasContainer ? canvasContainer.clientHeight : document.documentElement.clientHeight);
+
+        if(width % 2 !== 0) width--;
+        if(height % 2 !== 0) height--;
+
         this.canvas.style.width = `${width}px`;
         this.canvas.style.height = `${height}px`;
+
         width = Math.round(width * this.pixelRatio);
         height = Math.round(height * this.pixelRatio);
 
