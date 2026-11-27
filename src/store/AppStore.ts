@@ -13,6 +13,8 @@ import { extendLine } from '../simulator/CyclographSimulator';
 export interface SimulatorApi {
     initialize(): void;
     updateParamsFromStore(redraw?: boolean): void;
+    startRecording(): void;
+    stopRecording(): void;
     start(): void;
     stop(): void;
     restart(): void;

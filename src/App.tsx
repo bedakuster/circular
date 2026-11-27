@@ -121,6 +121,10 @@ export const App = observer((): ReactElement => {
 
                     <div className="panel"><button onClick={() => simulatorRef.current?.immediate()}>Immediate Result</button></div>
                     <div className="panel">
+                        <button onClick={() => simulatorRef.current?.startRecording()}>Start Recording</button>
+                        <button onClick={() => simulatorRef.current?.stopRecording()}>Stop Recording</button>
+                    </div>
+                    <div className="panel">
                         <button onClick={() => simulatorRef.current?.start()}>Start Animation</button>
                         <button onClick={() => simulatorRef.current?.stop()}>Stop Animation</button>
                         <button onClick={() => simulatorRef.current?.reset()}>Reset</button>

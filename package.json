@@ -20,6 +20,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "mediabunny": "^1.66.4",
     "mobx": "^7.1.7",
     "mobx-react-lite": "^5.1.3",
     "react": "^19.3.1",

@@ -1,10 +1,22 @@
 import { AppStore } from '../store/AppStore';
 import { DraggablePoint, Point } from '../types';
+import { BufferTarget, CanvasSource, Mp4OutputFormat, Output } from 'mediabunny';
 
 type DrawPoint = Point & { keep: boolean; i: number };
 
 const gcd = (a: number, b: number): number => (b === 0 ? Math.abs(a) : gcd(b, a % b));
 const keepEveryNthPoint = 2;
+const recordingFrameRate = 60;
+const recordingTailSeconds = 5;
+
+type WebCodecsRecordingSession = {
+    output: Output<Mp4OutputFormat, BufferTarget>;
+    videoSource: CanvasSource;
+    timestampUs: number;
+    frameCount: number;
+    startPromise: Promise<void>;
+    pendingFrameWrite: Promise<void>;
+};
 
 const calculateDistance = (x1: number, y1: number, x2: number, y2: number): number =>
     Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
@@ -79,8 +91,12 @@ export class CyclographSimulator {
     private currentRounds = 0;
     private points: DrawPoint[] = [];
     private realPointCount = 0;
-    private pixelRatio = window.devicePixelRatio || 1;
+    private pixelRatio = Math.max(window.devicePixelRatio, 2);
     private immediateFastPathTargetRounds = 0;
+    private mediaRecorder: MediaRecorder | null = null;
+    private recordingChunks: Blob[] = [];
+    private webCodecsRecording: WebCodecsRecordingSession | null = null;
+    private recordingTailScheduled = false;
 
     private isDragging = false;
     private dragStartPosition: Point = { x: 0, y: 0 };
@@ -116,6 +132,195 @@ export class CyclographSimulator {
 
     getCanvasDataUrl(): string {
         return this.canvas.toDataURL('image/png');
+    }
+
+    private getMediaRecorderMimeType(): string {
+        const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+        for (const mimeType of candidates) {
+            if (MediaRecorder.isTypeSupported(mimeType)) return mimeType;
+        }
+        return 'video/webm';
+    }
+
+    startRecording(): void {
+        if (this.isRecordingActive()) {
+            throw new Error('A recording is already in progress.');
+        }
+
+        this.recordingTailScheduled = false;
+        if (!this.startWebCodecsRecording()) {
+            this.startMediaRecorderRecording();
+        }
+
+        if (this.isStopped) {
+            this.start();
+        }
+    }
+
+    stopRecording(): void {
+        if (this.webCodecsRecording) {
+            const recording = this.webCodecsRecording;
+            this.webCodecsRecording = null;
+            this.recordingTailScheduled = false;
+            void this.finalizeWebCodecsRecording(recording);
+            return;
+        }
+        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+            this.recordingTailScheduled = false;
+            this.mediaRecorder.stop();
+        }
+    }
+
+    private scheduleRecordingTailIfNeeded(): 'none' | 'webcodecs' | 'mediaRecorderDelayed' {
+        if (this.recordingTailScheduled || this.currentRounds < this.neededRounds || !this.isRecordingActive()) {
+            return 'none';
+        }
+
+        this.recordingTailScheduled = true;
+
+        if (this.webCodecsRecording) {
+            const recording = this.webCodecsRecording;
+            const tailFrameCount = Math.max(1, Math.round(recordingTailSeconds * recordingFrameRate));
+            const tailFrameDurationUs = Math.max(1, Math.round(1_000_000 / recordingFrameRate));
+            recording.pendingFrameWrite = recording.pendingFrameWrite
+                .then(() => recording.startPromise)
+                .then(async () => {
+                    for (let i = 0; i < tailFrameCount; i++) {
+                        const frameTimestampSeconds = (recording.timestampUs + i * tailFrameDurationUs) / 1_000_000;
+                        const frameDurationSeconds = tailFrameDurationUs / 1_000_000;
+                        await recording.videoSource.add(frameTimestampSeconds, frameDurationSeconds);
+                    }
+                })
+                .catch(error => {
+                    console.error(error);
+                });
+            recording.timestampUs += tailFrameCount * tailFrameDurationUs;
+            recording.frameCount += tailFrameCount;
+            return 'webcodecs';
+        }
+
+        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+            const recorder = this.mediaRecorder;
+            window.setTimeout(() => {
+                if (this.mediaRecorder === recorder && recorder.state !== 'inactive') {
+                    this.stopRecording();
+                }
+            }, recordingTailSeconds * 1000);
+            return 'mediaRecorderDelayed';
+        }
+
+        return 'none';
+    }
+
+    private isRecordingActive(): boolean {
+        return Boolean(this.webCodecsRecording) || Boolean(this.mediaRecorder && this.mediaRecorder.state !== 'inactive');
+    }
+
+    private startWebCodecsRecording(): boolean {
+        if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') {
+            return false;
+        }
+
+        try {
+            const width = Math.max(2, this.canvas.width);
+            const height = Math.max(2, this.canvas.height);
+            const output = new Output({
+                format: new Mp4OutputFormat(),
+                target: new BufferTarget(),
+            });
+            const videoSource = new CanvasSource(this.canvas, {
+                codec: 'avc',
+                bitrate: Math.max(1_000_000, Math.floor(width * height * 8)),
+                keyFrameInterval: 2,
+            });
+            output.addVideoTrack(videoSource);
+            const startPromise = output.start();
+
+            this.webCodecsRecording = {
+                output,
+                videoSource,
+                timestampUs: 0,
+                frameCount: 0,
+                startPromise,
+                pendingFrameWrite: Promise.resolve(),
+            };
+            return true;
+        } catch (error) {
+            console.error(error);
+            return false;
+        }
+    }
+
+    private startMediaRecorderRecording(): void {
+        if (typeof MediaRecorder === 'undefined') {
+            throw new Error('Neither WebCodecs nor MediaRecorder APIs are available in this browser.');
+        }
+        this.recordingChunks = [];
+        const stream = this.canvas.captureStream(recordingFrameRate);
+        const recorder = new MediaRecorder(stream, { mimeType: this.getMediaRecorderMimeType() });
+
+        recorder.ondataavailable = event => {
+            if (event.data.size > 0) this.recordingChunks.push(event.data);
+        };
+
+        recorder.onstop = () => {
+            const blob = new Blob(this.recordingChunks, { type: recorder.mimeType || 'video/webm' });
+            this.recordingChunks = [];
+            this.mediaRecorder = null;
+
+            stream.getTracks().forEach(track => track.stop());
+            if (blob.size === 0) return;
+            this.downloadRecording(blob, 'webm');
+        };
+
+        this.mediaRecorder = recorder;
+        recorder.start();
+    }
+
+    private captureRecordingFrame(): void {
+        const recording = this.webCodecsRecording;
+        if (!recording) return;
+
+        const frameDurationUs = Math.max(1, Math.round(1_000_000 / recordingFrameRate));
+        const frameTimestampSeconds = recording.timestampUs / 1_000_000;
+        const frameDurationSeconds = frameDurationUs / 1_000_000;
+
+        recording.pendingFrameWrite = recording.pendingFrameWrite
+            .then(() => recording.startPromise)
+            .then(() => recording.videoSource.add(frameTimestampSeconds, frameDurationSeconds))
+            .catch(error => {
+                console.error(error);
+            });
+
+        recording.timestampUs += frameDurationUs;
+        recording.frameCount += 1;
+    }
+
+    private async finalizeWebCodecsRecording(recording: WebCodecsRecordingSession): Promise<void> {
+        try {
+            await recording.startPromise;
+            await recording.pendingFrameWrite;
+            await recording.output.finalize();
+
+            const buffer = recording.output.target.buffer;
+            if (!buffer || buffer.byteLength === 0) return;
+            const blob = new Blob([buffer], { type: 'video/mp4' });
+            this.downloadRecording(blob, 'mp4');
+        } catch (error) {
+            console.error(error);
+            window.alert('Could not finalize WebCodecs recording.');
+        }
+    }
+
+    private downloadRecording(blob: Blob, extension: 'webm' | 'mp4'): void {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `cyclograph-recording-${new Date().toISOString().replace(/[:.]/g, '-')}.${extension}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     }
 
     ensurePatternRendered(): void {
@@ -204,19 +409,31 @@ export class CyclographSimulator {
         const safeSpeed = Math.max(speed, 1);
         if (remainingRounds <= 0) return baseStepSize;
 
-        const minFactor = 0.15;
+        const easeInMinFactor = 0.15;
+        const easeOutMinFactor = 0.1;
         const easeInWindow = 1;
         const easeOutWindow = 1;
         let easeInFactor = 1;
         let easeOutFactor = 1;
 
+        const clamp01 = (t: number): number => Math.min(1, Math.max(0, t));
+        const circularEaseIn = (t: number): number => {
+            const clamped = clamp01(t);
+            return 1 - Math.sqrt(Math.max(0, 1 - clamped * clamped));
+        };
+        const circularEaseOut = (t: number): number => {
+            const clamped = clamp01(t);
+            const inverse = clamped - 1;
+            return Math.sqrt(Math.max(0, 1 - inverse * inverse));
+        };
+
         if (rounds < easeInWindow) {
             const normalizedProgress = Math.max(0, rounds) / easeInWindow;
-            easeInFactor = minFactor + (1 - minFactor) * normalizedProgress * normalizedProgress;
+            easeInFactor = easeInMinFactor + (1 - easeInMinFactor) * circularEaseIn(normalizedProgress);
         }
         if (remainingRounds < easeOutWindow) {
             const normalizedRemaining = Math.max(0, remainingRounds) / easeOutWindow;
-            easeOutFactor = minFactor + (1 - minFactor) * normalizedRemaining * normalizedRemaining;
+            easeOutFactor = easeOutMinFactor + (1 - easeOutMinFactor) * circularEaseOut(normalizedRemaining);
         }
 
         const easedFactor = Math.min(easeInFactor, easeOutFactor);
@@ -416,9 +633,9 @@ export class CyclographSimulator {
             this.context.lineWidth = this.getControlThickness();
             this.context.font = '12px Arial';
             this.applyCanvasEffect(this.getControlEffectColor(), this.getControlEffectBlur());
-            this.context.fillText(drawingParameters.leftGear.teeth.toString(), drawingParameters.leftGear.x, drawingParameters.leftGear.y);
-            this.context.fillText(drawingParameters.rightGear.teeth.toString(), drawingParameters.rightGear.x, drawingParameters.rightGear.y);
-            this.context.fillText(drawingParameters.turntable.teeth.toString(), drawingParameters.turntable.x, drawingParameters.turntable.y - drawingParameters.turntable.radius - 20);
+            // this.context.fillText(drawingParameters.leftGear.teeth.toString(), drawingParameters.leftGear.x, drawingParameters.leftGear.y);
+            // this.context.fillText(drawingParameters.rightGear.teeth.toString(), drawingParameters.rightGear.x, drawingParameters.rightGear.y);
+            // this.context.fillText(drawingParameters.turntable.teeth.toString(), drawingParameters.turntable.x, drawingParameters.turntable.y - drawingParameters.turntable.radius - 20);
             this.context.lineWidth = this.getControlThickness();
             this.context.strokeStyle = this.getControlColor();
             this.context.fillStyle = this.getControlColor();
@@ -452,10 +669,7 @@ export class CyclographSimulator {
             this.context.arc(turntableCurrentX, turntableCurrentY, 2, 0, 2 * Math.PI);
             this.context.fill();
 
-            this.context.beginPath();
-            this.context.moveTo(leftGearPivotX, leftGearPivotY);
-            this.context.lineTo(rightGearPivotX, rightGearPivotY);
-            this.context.stroke();
+
 
             if (drawingParameters.armType === 'SuperClaw') {
                 if (leftClawLengthToIntersection + rightClawLengthToIntersection < maxPossiblePivotDistance) this.context.strokeStyle = 'red';
@@ -483,6 +697,12 @@ export class CyclographSimulator {
                 this.context.stroke();
                 this.context.strokeStyle = this.getStrokeColor();
             } else {
+
+                this.context.beginPath();
+                this.context.moveTo(leftGearPivotX, leftGearPivotY);
+                this.context.lineTo(rightGearPivotX, rightGearPivotY);
+                this.context.stroke();
+
                 this.context.beginPath();
                 this.context.arc(midpoint.x, midpoint.y, 2, 0, 2 * Math.PI);
                 this.context.fill();
@@ -546,6 +766,10 @@ export class CyclographSimulator {
             return false;
         }
 
+        if (!skipDraw) {
+            this.captureRecordingFrame();
+        }
+
         if (skipDraw || drawExactlyOnce) return;
 
         const baseStepSize = this.store.ui.stepSize;
@@ -576,12 +800,12 @@ export class CyclographSimulator {
                 (Math.min(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth) /
                     gcd(drawingParameters.turntable.teeth, drawingParameters.rightGear.teeth)) *
                 drawingParameters.leftGear.teeth / gcd(drawingParameters.turntable.teeth, drawingParameters.leftGear.teeth);
-        
+
         }
         if (drawingParameters.turntable.disabled) {
             this.neededRounds = (drawingParameters.rightGear.teeth / drawingParameters.turntable.teeth) * drawingParameters.leftGear.teeth;
 
-            
+
         }
         this.store.neededRounds = this.neededRounds;
     }
@@ -744,7 +968,7 @@ export class CyclographSimulator {
 
 
         const stepSize = this.store.ui.stepSize;
-        const perc90 = Math.floor(this.neededRounds * 0.9);
+        const perc90 = Math.floor(this.neededRounds * 0.999);
         let targetSum = 0
         for (let i = 0; i < perc90; i += stepSize) {
             targetSum += stepSize;
@@ -811,7 +1035,11 @@ export class CyclographSimulator {
             window.cancelAnimationFrame(this.animationHandle);
             this.animationHandle = null;
             this.isStopped = true;
-            this.calculatePoint(this.currentRounds, false, true);
+            // this.calculatePoint(this.currentRounds, false, true);
+        }
+        const recordingTailMode = this.scheduleRecordingTailIfNeeded();
+        if (recordingTailMode !== 'mediaRecorderDelayed') {
+            this.stopRecording();
         }
         this.drawInfo();
     }
