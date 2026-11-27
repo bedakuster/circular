@@ -1,6 +1,7 @@
 import { observer } from 'mobx-react-lite';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
+import { Circle, Expand, Pause, Play, RefreshCcw, RotateCcw, RotateCw, SkipForward, Square } from 'lucide-react';
 import { marked } from 'marked';
 import { appStore } from './store/AppStore';
 import { CyclographSimulator } from './simulator/CyclographSimulator';
@@ -183,29 +184,35 @@ export const App = observer((): ReactElement => {
                         <div className="panel warning">{appStore.warning}</div>
                     }
                     <div className="canvas-container">
-                        <div className="canvas-toolbar" role="toolbar" aria-label="Animation controls">
-                            <button type="button" className="canvas-toolbar-button record" title="Start recording" aria-label="Start recording" onClick={() => simulatorRef.current?.startRecording()}>⏺</button>
-                            <button type="button" className="canvas-toolbar-button" title="Stop recording" aria-label="Stop recording" onClick={() => simulatorRef.current?.stopRecording()}>⏹</button>
-                            <button type="button" className="canvas-toolbar-button" title="Start animation" aria-label="Start animation" onClick={() => simulatorRef.current?.start()}>▶</button>
-                            <button type="button" className="canvas-toolbar-button" title="Stop animation" aria-label="Stop animation" onClick={() => simulatorRef.current?.stop()}>⏸</button>
-                            <button type="button" className="canvas-toolbar-button" title="Reset" aria-label="Reset" onClick={() => simulatorRef.current?.reset()}>↺</button>
-                            <button type="button" className="canvas-toolbar-button" title="Restart animation" aria-label="Restart animation" onClick={() => simulatorRef.current?.restart()}>⟲</button>
-                            <button type="button" className="canvas-toolbar-button" title="Play last 10%" aria-label="Play last ten percent" onClick={() => simulatorRef.current?.last10Percents()}>⏭</button>
-                            <button type="button" className="canvas-toolbar-button" title="Refresh" aria-label="Refresh" onClick={() => simulatorRef.current?.immediate()}>🔄</button>
+                        <div className="canvas-top-toolbar">
 
+                           
+
+                            <div className="canvas-toolbar top-left">
+                                <SliderControl label="Speed" value={appStore.ui.speed} min={1} max={20} onChange={value => setNumeric('speed', value, false)} />
+                            </div>
+
+                             <div className="canvas-toolbar icons" role="toolbar" aria-label="Animation controls">
+                                <button type="button" className="canvas-toolbar-button record" title="Start recording" aria-label="Start recording" onClick={() => simulatorRef.current?.startRecording()}><Circle /></button>
+                                <button type="button" className="canvas-toolbar-button" title="Stop recording" aria-label="Stop recording" onClick={() => simulatorRef.current?.stopRecording()}><Square /></button>
+                                <button type="button" className="canvas-toolbar-button" title="Start animation" aria-label="Start animation" onClick={() => simulatorRef.current?.start()}><Play /></button>
+                                <button type="button" className="canvas-toolbar-button" title="Stop animation" aria-label="Stop animation" onClick={() => simulatorRef.current?.stop()}><Pause /></button>
+                                <button type="button" className="canvas-toolbar-button" title="Reset" aria-label="Reset" onClick={() => simulatorRef.current?.reset()}><RotateCcw /></button>
+                                <button type="button" className="canvas-toolbar-button" title="Restart animation" aria-label="Restart animation" onClick={() => simulatorRef.current?.restart()}><RotateCw /></button>
+                                <button type="button" className="canvas-toolbar-button" title="Play last 10%" aria-label="Play last ten percent" onClick={() => simulatorRef.current?.last10Percents()}><SkipForward /></button>
+                                <button type="button" className="canvas-toolbar-button" title="Refresh" aria-label="Refresh" onClick={() => simulatorRef.current?.immediate()}><RefreshCcw /></button>
+                                <button type="button" className="canvas-toolbar-button" title="Full screen" aria-label="Full screen" onClick={() => simulatorRef.current?.requestFullScreen()}><Expand /></button>
+                            </div>
+
+                            <div className="canvas-toolbar top-right">
+
+                                <label className="control">
+                                    <span>Controls</span>
+                                    <input type="checkbox" checked={appStore.ui.drawControls} onChange={e => setBoolean('drawControls', e.target.checked)} />
+                                </label>
+                            </div>
                         </div>
 
-                        <div className="canvas-toolbar top-left">
-                            <SliderControl label="Speed" value={appStore.ui.speed} min={1} max={20} onChange={value => setNumeric('speed', value, false)} />
-                        </div>
-
-                        <div className="canvas-toolbar top-right">
-
-                            <label className="control">
-                                <span>Controls</span>
-                                <input type="checkbox" checked={appStore.ui.drawControls} onChange={e => setBoolean('drawControls', e.target.checked)} />
-                            </label>
-                        </div>
                         <div id="info-panel" className="canvas-info-panel">
                             {appStore.progressText}
                         </div>

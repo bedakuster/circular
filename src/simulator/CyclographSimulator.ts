@@ -344,7 +344,7 @@ export class CyclographSimulator {
     private getStrokeColor(): string {
         const chosenColor = this.store.ui.strokeColor.trim();
 
-        if(chosenColor === 'black' && this.getCanvasBackgroundColor() === 'black') {
+        if (chosenColor === 'black' && this.getCanvasBackgroundColor() === 'black') {
             return 'white';
         }
 
@@ -352,7 +352,7 @@ export class CyclographSimulator {
     }
 
     private getControlColor(): string {
-        if(!this.isStopped) 
+        if (!this.isStopped)
             return this.isDarkMode() ? '#777777' : '#494949';
         return this.isDarkMode() ? '#6bbcff' : '#001747';
     }
@@ -941,7 +941,7 @@ export class CyclographSimulator {
         this.drawInfo()
         if (redraw && this.isStopped) {
             this.immediate(true, 0.015);
-            if(this.immediateHighResRedrawTimeout)
+            if (this.immediateHighResRedrawTimeout)
                 clearTimeout(this.immediateHighResRedrawTimeout);
             this.immediateHighResRedrawTimeout = setTimeout(() => this.immediate(), 1000) as any
         }
@@ -1063,6 +1063,16 @@ export class CyclographSimulator {
         this.reset();
     }
 
+    requestFullScreen(): void {
+        if (this.canvas.requestFullscreen) {
+            this.canvas.requestFullscreen();
+        } else if ((this.canvas as any).webkitRequestFullscreen) { /* Safari */
+            (this.canvas as any).webkitRequestFullscreen();
+        } else if ((this.canvas as any).msRequestFullscreen) { /* IE11 */
+            (this.canvas as any).msRequestFullscreen();
+        }
+    }
+
     resize(): void {
         const canvasContainer = this.canvas.closest('.canvas-container') as HTMLElement | null;
 
@@ -1073,8 +1083,10 @@ export class CyclographSimulator {
 
         this.canvas.style.display = "block"
 
-        if(width % 2 !== 0) width--;
-        if(height % 2 !== 0) height--;
+        if (width % 2 !== 0) width--;
+        if (height % 2 !== 0) height--;
+
+
 
         this.canvas.style.width = `${width}px`;
         this.canvas.style.height = `${height}px`;

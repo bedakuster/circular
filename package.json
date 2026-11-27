@@ -20,6 +20,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "lucide-react": "^0.554.0",
     "marked": "^16.4.2",
     "mediabunny": "^1.66.4",
     "mobx": "^7.1.7",
