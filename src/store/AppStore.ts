@@ -131,6 +131,8 @@ export class AppStore {
             leftArm: { ...createDefaultDrawingParameters().claw.leftArm, ...state.drawingParameters.claw?.leftArm },
             rightArm: { ...createDefaultDrawingParameters().claw.rightArm, ...state.drawingParameters.claw?.rightArm },
         };
+        mergedDrawing.turntableCircularMovement = { ...mergedDrawing.turntableCircularMovement, ...state.drawingParameters.turntableCircularMovement };
+
         this.drawingParameters = mergedDrawing;
 
         const mergedDraggables = createDefaultDraggables();

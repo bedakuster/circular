@@ -1,6 +1,7 @@
 import { observer } from 'mobx-react-lite';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
+import { marked } from 'marked';
 import { appStore } from './store/AppStore';
 import { CyclographSimulator } from './simulator/CyclographSimulator';
 import { StateManager } from './components/StateManager';
@@ -25,8 +26,18 @@ const SliderControl = ({ label, value, min, max, step = 1, onChange }: SliderPro
 export const App = observer((): ReactElement => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const simulatorRef = useRef<CyclographSimulator | null>(null);
+    const [guideOpen, setGuideOpen] = useState(false);
+    const [guideHtml, setGuideHtml] = useState('');
+    const [guideError, setGuideError] = useState('');
 
     useEffect(() => {
+
+        const resizeHandler = () => {
+            if (!simulatorRef.current) return;
+            simulatorRef.current.resize();
+        };
+        window.onresize = resizeHandler;
+
         if (!canvasRef.current) return;
         if (appStore.simulator) return;
 
@@ -35,13 +46,38 @@ export const App = observer((): ReactElement => {
         simulatorRef.current = simulator;
         appStore.attachSimulator(simulator);
 
-        const resizeHandler = (): void => simulator.resize();
-        window.addEventListener('resize', resizeHandler);
+
         return () => {
-            window.removeEventListener('resize', resizeHandler);
+            window.onresize = null;
             simulator.stop();
         };
     }, []);
+
+    useEffect(() => {
+        if (!guideOpen || guideHtml || guideError) return;
+
+        let active = true;
+        const loadGuide = async (): Promise<void> => {
+            try {
+                const response = await fetch('guide.md');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const markdown = await response.text();
+                const rendered = await marked.parse(markdown);
+                if (!active) return;
+                setGuideHtml(rendered);
+            } catch {
+                if (!active) return;
+                setGuideError('Could not load the guide.');
+            }
+        };
+
+        void loadGuide();
+        return () => {
+            active = false;
+        };
+    }, [guideOpen, guideHtml, guideError]);
 
     const setNumeric = (key: keyof typeof appStore.ui, value: number, redraw = true): void => {
         appStore.setUiValue(key, value as never);
@@ -61,17 +97,25 @@ export const App = observer((): ReactElement => {
                 <div className="sidebar">
                     <StateManager />
                     <div className="panel">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                appStore.setDarkMode(!appStore.darkMode);
+                                simulatorRef.current?.updateParamsFromStore();
+                                simulatorRef.current?.reset();
+                            }}
+                        >
+                            {appStore.darkMode ? 'Light mode' : 'Dark mode'}
+                        </button>
+                        <button onClick={() => simulatorRef.current?.factoryReset()}>Factory Reset</button>
+                        <button type="button" onClick={() => { setGuideError(''); setGuideOpen(true); }}>Guide</button>
+                    </div>
+
+                    <div className="panel">
                         <SliderControl label="Left" value={appStore.ui.leftGear} min={1} max={80} onChange={value => setNumeric('leftGear', value)} />
                         <SliderControl label="Right" value={appStore.ui.rightGear} min={1} max={120} onChange={value => setNumeric('rightGear', value)} />
                         <SliderControl label="Turntable" value={appStore.ui.turntable} min={1} max={180} onChange={value => setNumeric('turntable', value)} />
 
-                        <label className="control">
-                            <span>Anchor</span>
-                            <select value={appStore.ui.anchor} onChange={e => { appStore.setUiValue('anchor', e.target.value as never); simulatorRef.current?.updateParamsFromStore(); }}>
-                                <option>Left</option>
-                                <option>Right</option>
-                            </select>
-                        </label>
 
                         <SliderControl label="Left Radius" value={appStore.ui.leftGearRadius} min={0} max={500} step={0.1} onChange={value => setNumeric('leftGearRadius', value)} />
                         <SliderControl label="Right Radius" value={appStore.ui.rightGearRadius} min={0} max={500} step={0.1} onChange={value => setNumeric('rightGearRadius', value)} />
@@ -100,63 +144,89 @@ export const App = observer((): ReactElement => {
                                 <option>SuperClaw</option>
                             </select>
                         </label>
-                        <SliderControl label="Rod Len" value={appStore.ui.rodLength} min={-1000} max={1000} onChange={value => setNumeric('rodLength', value)} />
-                        <SliderControl label="Rod X" value={appStore.ui.rodX} min={0} max={1000} onChange={value => setNumeric('rodX', value)} />
-                        <SliderControl label="Rod Angle" value={appStore.ui.rodAngle * 180 / Math.PI} min={-360} max={360} step={0.1} onChange={value => setNumeric('rodAngle', value / 180 * Math.PI)} />
+
+                        {appStore.ui.arm === 'Simple' && <>
+                            <label className="control">
+                                <span>Anchor</span>
+                                <select value={appStore.ui.anchor} onChange={e => { appStore.setUiValue('anchor', e.target.value as never); simulatorRef.current?.updateParamsFromStore(); }}>
+                                    <option>Left</option>
+                                    <option>Right</option>
+                                </select>
+                            </label>
+
+                            <SliderControl label="Rod Len" value={appStore.ui.rodLength} min={-1000} max={1000} onChange={value => setNumeric('rodLength', value)} />
+                            <SliderControl label="Rod X" value={appStore.ui.rodX} min={0} max={1000} onChange={value => setNumeric('rodX', value)} />
+                            <SliderControl label="Rod Angle" value={appStore.ui.rodAngle * 180 / Math.PI} min={-360} max={360} step={0.1} onChange={value => setNumeric('rodAngle', value / 180 * Math.PI)} />
+                        </>}
                     </div>
 
                     <div className="panel">
                         <SliderControl label="Stroke" value={appStore.ui.strokeSize} min={0.1} max={10} step={0.1} onChange={value => setNumeric('strokeSize', value, false)} />
                         <label className="control">
-                            <span>Color</span>
-                            <input type="text" value={appStore.ui.strokeColor} onChange={e => { appStore.setUiValue('strokeColor', e.target.value); simulatorRef.current?.updateParamsFromStore(); }} />
+                            <span>Stroke Color</span>
+                            <input type="color" value={appStore.ui.strokeColor} onChange={e => { appStore.setUiValue('strokeColor', e.target.value); simulatorRef.current?.updateParamsFromStore(); }} />
+                        </label>
+                        <label className="control">
+                            <span>Background Color</span>
+                            <input type="color" value={appStore.ui.bgColor} onChange={e => { appStore.setUiValue('bgColor', e.target.value); simulatorRef.current?.updateParamsFromStore(); }} />
                         </label>
                         <SliderControl label="Step" value={appStore.ui.stepSize} min={0.001} max={0.1} step={0.001} onChange={value => setNumeric('stepSize', value)} />
-                        <SliderControl label="Speed" value={appStore.ui.speed} min={1} max={20} onChange={value => setNumeric('speed', value, false)} />
-                        <label className="control checkbox">
-                            <span>Controls</span>
-                            <input type="checkbox" checked={appStore.ui.drawControls} onChange={e => setBoolean('drawControls', e.target.checked)} />
-                        </label>
+
                     </div>
 
-                    <div className="panel"><button onClick={() => simulatorRef.current?.immediate()}>Immediate Result</button></div>
-                    <div className="panel">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                appStore.setDarkMode(!appStore.darkMode);
-                                simulatorRef.current?.updateParamsFromStore();
-                                simulatorRef.current?.reset();
-                            }}
-                        >
-                            {appStore.darkMode ? 'Light mode' : 'Dark mode'}
-                        </button>
-                        <button onClick={() => simulatorRef.current?.factoryReset()}>Factory Reset</button>
-                    </div>
+                    {/* <div className="panel"><button onClick={() => simulatorRef.current?.immediate()}>Immediate Result</button></div> */}
+
                 </div>
 
                 <div className="maincontent">
-                    <div id="info-panel" className="panel">
-                        {appStore.progressText}
-
-                    </div>
                     {appStore.warning &&
                         <div className="panel warning">{appStore.warning}</div>
                     }
                     <div className="canvas-container">
                         <div className="canvas-toolbar" role="toolbar" aria-label="Animation controls">
-                            <button type="button" className="canvas-toolbar-button" title="Start recording" aria-label="Start recording" onClick={() => simulatorRef.current?.startRecording()}>⏺</button>
+                            <button type="button" className="canvas-toolbar-button record" title="Start recording" aria-label="Start recording" onClick={() => simulatorRef.current?.startRecording()}>⏺</button>
                             <button type="button" className="canvas-toolbar-button" title="Stop recording" aria-label="Stop recording" onClick={() => simulatorRef.current?.stopRecording()}>⏹</button>
                             <button type="button" className="canvas-toolbar-button" title="Start animation" aria-label="Start animation" onClick={() => simulatorRef.current?.start()}>▶</button>
                             <button type="button" className="canvas-toolbar-button" title="Stop animation" aria-label="Stop animation" onClick={() => simulatorRef.current?.stop()}>⏸</button>
                             <button type="button" className="canvas-toolbar-button" title="Reset" aria-label="Reset" onClick={() => simulatorRef.current?.reset()}>↺</button>
                             <button type="button" className="canvas-toolbar-button" title="Restart animation" aria-label="Restart animation" onClick={() => simulatorRef.current?.restart()}>⟲</button>
                             <button type="button" className="canvas-toolbar-button" title="Play last 10%" aria-label="Play last ten percent" onClick={() => simulatorRef.current?.last10Percents()}>⏭</button>
+                            <button type="button" className="canvas-toolbar-button" title="Refresh" aria-label="Refresh" onClick={() => simulatorRef.current?.immediate()}>🔄</button>
+
                         </div>
+
+                        <div className="canvas-toolbar top-left">
+                            <SliderControl label="Speed" value={appStore.ui.speed} min={1} max={20} onChange={value => setNumeric('speed', value, false)} />
+                        </div>
+
+                        <div className="canvas-toolbar top-right">
+
+                            <label className="control">
+                                <span>Controls</span>
+                                <input type="checkbox" checked={appStore.ui.drawControls} onChange={e => setBoolean('drawControls', e.target.checked)} />
+                            </label>
+                        </div>
+                        <div id="info-panel" className="canvas-info-panel">
+                            {appStore.progressText}
+                        </div>
+
                         <canvas height={900} width={1000} id="c" ref={canvasRef} />
                     </div>
                 </div>
             </div>
+            {guideOpen && (
+                <div className="modal-backdrop" role="presentation" onMouseDown={() => setGuideOpen(false)}>
+                    <div className="state-modal guide-modal" role="dialog" aria-modal="true" aria-labelledby="guide-title" onMouseDown={event => event.stopPropagation()}>
+                        <h2 id="guide-title">Guide</h2>
+                        {guideError && <p>{guideError}</p>}
+                        {!guideError && !guideHtml && <p>Loading guide...</p>}
+                        {!guideError && guideHtml && <div className="guide-content" dangerouslySetInnerHTML={{ __html: guideHtml }} />}
+                        <div className="modal-actions">
+                            <button type="button" onClick={() => setGuideOpen(false)}>Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 });

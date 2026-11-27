@@ -1,5 +1,6 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = (_env, argv) => {
     const isProduction = argv.mode === 'production';
@@ -31,6 +32,12 @@ module.exports = (_env, argv) => {
     plugins: [
         new HtmlWebpackPlugin({
             template: './src/index.html',
+        }),
+        new CopyWebpackPlugin({
+            patterns: [
+                { from: './guide.md', to: 'guide.md' },
+                { from: './guide-assets', to: 'guide-assets' },
+            ],
         }),
     ],
     devServer: {

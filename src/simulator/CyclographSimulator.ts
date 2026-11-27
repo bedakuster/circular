@@ -98,6 +98,8 @@ export class CyclographSimulator {
     private webCodecsRecording: WebCodecsRecordingSession | null = null;
     private recordingTailScheduled = false;
 
+    private immediateHighResRedrawTimeout: number | null = null
+
     private isDragging = false;
     private dragStartPosition: Point = { x: 0, y: 0 };
     private currentTransformedCursor: Point | null = null;
@@ -335,14 +337,18 @@ export class CyclographSimulator {
     }
 
     private getCanvasBackgroundColor(): string {
-        return this.isDarkMode() ? '#0d1117' : 'white';
+        const chosenColor = this.store.ui.bgColor.trim();
+        return chosenColor;
     }
 
     private getStrokeColor(): string {
         const chosenColor = this.store.ui.strokeColor.trim();
-        if (!chosenColor) return this.isDarkMode() ? '#edf3ff' : 'black';
-        if (chosenColor === 'white' && !this.isDarkMode()) return 'black';
-        return chosenColor === 'black' && this.isDarkMode() ? '#edf3ff' : chosenColor;
+
+        if(chosenColor === 'black' && this.getCanvasBackgroundColor() === 'black') {
+            return 'white';
+        }
+
+        return chosenColor
     }
 
     private getControlColor(): string {
@@ -935,6 +941,9 @@ export class CyclographSimulator {
         this.drawInfo()
         if (redraw && this.isStopped) {
             this.immediate(true, 0.015);
+            if(this.immediateHighResRedrawTimeout)
+                clearTimeout(this.immediateHighResRedrawTimeout);
+            this.immediateHighResRedrawTimeout = setTimeout(() => this.immediate(), 1000) as any
         }
     }
 
@@ -1057,8 +1066,12 @@ export class CyclographSimulator {
     resize(): void {
         const canvasContainer = this.canvas.closest('.canvas-container') as HTMLElement | null;
 
+        this.canvas.style.display = "none"
+
         let width = Math.floor(canvasContainer ? canvasContainer.clientWidth : document.documentElement.clientWidth);
         let height = Math.floor(canvasContainer ? canvasContainer.clientHeight : document.documentElement.clientHeight);
+
+        this.canvas.style.display = "block"
 
         if(width % 2 !== 0) width--;
         if(height % 2 !== 0) height--;

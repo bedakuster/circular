@@ -1,14 +1,23 @@
 import { observer } from 'mobx-react-lite';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { DragEvent as ReactDragEvent, ReactElement } from 'react';
 import { appStore } from '../store/AppStore';
+import type { SavedCyclographState } from '../types';
+import presetsData from '../presets.json';
+
+type LoadTab = 'saved' | 'presets';
 
 export const StateManager = observer((): ReactElement => {
     const [saveOpen, setSaveOpen] = useState(false);
     const [loadOpen, setLoadOpen] = useState(false);
+    const [loadTab, setLoadTab] = useState<LoadTab>('saved');
     const [name, setName] = useState('');
     const [dropActive, setDropActive] = useState(false);
     const [status, setStatus] = useState('');
+    const presets = useMemo(() => {
+        const parsed = presetsData as { states?: SavedCyclographState[] };
+        return Array.isArray(parsed.states) ? parsed.states : [];
+    }, []);
 
     useEffect(() => {
         appStore.refreshSavedStates();
@@ -74,9 +83,8 @@ export const StateManager = observer((): ReactElement => {
                 onDrop={onDrop}
             >
                 <button type="button" onClick={() => setSaveOpen(true)}>Save</button>
-                <button type="button" onClick={() => setLoadOpen(true)}>Load...</button>
-                <button type="button" onClick={downloadStates} disabled={appStore.savedStates.length === 0}>Download JSON</button>
-                {status && <span className="state-status">{status}</span>}
+                <button type="button" onClick={() => { setLoadTab('saved'); setLoadOpen(true); }}>Load/Presets</button>
+                {/* <button type="button" onClick={downloadStates} disabled={appStore.savedStates.length === 0}>Download JSON</button> */}
             </div>
 
             {saveOpen && (
@@ -99,24 +107,77 @@ export const StateManager = observer((): ReactElement => {
                 <div className="modal-backdrop" role="presentation" onMouseDown={() => setLoadOpen(false)}>
                     <div className="state-modal state-load-modal" role="dialog" aria-modal="true" aria-labelledby="load-title" onMouseDown={event => event.stopPropagation()}>
                         <h2 id="load-title">Load configuration</h2>
-                        {appStore.savedStates.length === 0 ? (
-                            <p>No saved configurations yet.</p>
-                        ) : (
-                            <div className="state-grid">
-                                {appStore.savedStates.map(state => (
-                                    <div className="state-card" key={state.id}>
-                                        {state.thumbnail
-                                            ? <img src={state.thumbnail} alt="" />
-                                            : <div className="state-thumbnail-placeholder">No thumbnail</div>}
-                                        <strong>{state.name}</strong>
-                                        <span>{new Date(state.savedAt).toLocaleString()}</span>
-                                        <div className="state-card-actions">
-                                            <button type="button" onClick={() => { appStore.loadSavedState(state.id); setLoadOpen(false); }}>Load</button>
-                                            <button type="button" className="delete-button" onClick={() => appStore.deleteSavedState(state.id)}>Delete</button>
+                        <div className="state-load-tabs" role="tablist" aria-label="Load source">
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={loadTab === 'saved'}
+                                className={loadTab === 'saved' ? 'state-load-tab active' : 'state-load-tab'}
+                                onClick={() => setLoadTab('saved')}
+                            >
+                                Saved
+                            </button>
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={loadTab === 'presets'}
+                                className={loadTab === 'presets' ? 'state-load-tab active' : 'state-load-tab'}
+                                onClick={() => setLoadTab('presets')}
+                            >
+                                Presets
+                            </button>
+                        </div>
+
+                        {loadTab === 'saved' && (
+                            appStore.savedStates.length === 0 ? (
+                                <p>No saved configurations yet.</p>
+                            ) : (
+                                <div className="state-grid">
+                                    {appStore.savedStates.map(state => (
+                                        <div className="state-card" key={state.id}>
+                                            {state.thumbnail
+                                                ? <img src={state.thumbnail} alt="" />
+                                                : <div className="state-thumbnail-placeholder">No thumbnail</div>}
+                                            <strong>{state.name}</strong>
+                                            <span>{new Date(state.savedAt).toLocaleString()}</span>
+                                            <div className="state-card-actions">
+                                                <button type="button" onClick={() => { appStore.loadSavedState(state.id); setLoadOpen(false); }}>Load</button>
+                                                <button type="button" className="delete-button" onClick={() => appStore.deleteSavedState(state.id)}>Delete</button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            )
+                        )}
+
+                        {loadTab === 'presets' && (
+                            presets.length === 0 ? (
+                                <p>No presets available.</p>
+                            ) : (
+                                <div className="state-grid">
+                                    {presets.map(state => (
+                                        <div className="state-card" key={state.id}>
+                                            {state.thumbnail
+                                                ? <img src={state.thumbnail} alt="" />
+                                                : <div className="state-thumbnail-placeholder">No thumbnail</div>}
+                                            <strong>{state.name}</strong>
+                                            <span>{new Date(state.savedAt).toLocaleString()}</span>
+                                            <div className="state-card-actions">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        appStore.applySavedState(state);
+                                                        setStatus(`Preset "${state.name}" loaded.`);
+                                                        setLoadOpen(false);
+                                                    }}
+                                                >
+                                                    Use preset
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
                         )}
                         <div className="modal-actions">
                             <button type="button" onClick={() => setLoadOpen(false)}>Close</button>

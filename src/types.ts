@@ -111,6 +111,7 @@ export interface UiState {
     rodAngle: number;
     strokeSize: number;
     strokeColor: string;
+    bgColor: string;
     stepSize: number;
     speed: number;
     drawControls: boolean;
@@ -149,7 +150,7 @@ export const createDefaultDrawingParameters = (): DrawingParameters => ({
     anchor: 'Left',
     armType: 'Simple',
     turntable: { x: 500, y: 500, radius: 400, teeth: 60, reversed: false, disabled: false },
-    turntableCircularMovement: { enabled: true, teeth: 60, radiusX: 100, radiusY: 100 },
+    turntableCircularMovement: { enabled: false, teeth: 60, radiusX: 100, radiusY: 100 },
     planetaryGear: { innerGear: 12, outerGear: 29, radius: 100, enabled: false },
     stepSize: 0.005,
     speed: 1,
@@ -176,7 +177,7 @@ export const createDefaultUiState = (): UiState => ({
     reverseLeftGear: false,
     reverseTurntable: false,
     disableTurntable: false,
-    turntableCircularMovementEnabled: true,
+    turntableCircularMovementEnabled: false,
     turntableCircularMovementTeeth: 60,
     turntableCircularMovementRadiusX: 100,
     turntableCircularMovementRadiusY: 100,
@@ -189,7 +190,8 @@ export const createDefaultUiState = (): UiState => ({
     rodX: 400,
     rodAngle: Math.PI / 2,
     strokeSize: 0.5,
-    strokeColor: 'black',
+    strokeColor: 'white',
+    bgColor: 'black',
     stepSize: 0.005,
     speed: 1,
     drawControls: true,
